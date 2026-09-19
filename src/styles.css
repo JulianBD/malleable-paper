@@ -230,3 +230,11 @@ input { font: inherit; }
 .ev-obj { color: var(--teal-d); }
 .ev-payload { color: var(--ink-2); word-break: break-word; width: 100%; }
 .imp-superseded, .imp-withdrawn { opacity: 0.5; }
+
+/* ---------- pages, digests, time ---------- */
+.frozen-tag { color: var(--teal-d); }
+.frame.frozen .clarify, .frame.frozen .affordances, .frame.frozen .more, .frame.frozen .next-moves .move { pointer-events: none; opacity: .35; }
+.coord-time { color: var(--teal-d); }
+.member { margin-top: 8px; padding-top: 10px; border-top: 2px solid var(--violet-l); }
+.member-label { color: var(--violet-d); }
+.digest .block .line { cursor: default; }

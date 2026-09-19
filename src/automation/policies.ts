@@ -55,8 +55,10 @@ export function holds(p: Policies, id: AgentIntentionId): boolean {
 
 export interface ParsedCommand {
   patch?: PolicyPatch
-  /** A navigation instead of a policy: go to this thread on the current day. */
+  /** A navigation instead of a policy: go to this thread on the current day ("*" = every thread). */
   thread?: string
+  /** Record a page: the current query at the current cut. */
+  snapshot?: boolean
   /** Short confirmation for the command line (generated language). */
   reply: string
 }
@@ -70,14 +72,18 @@ export const SEED_COMMANDS = [
   "Stop suggesting next moves.",
   "Reset to defaults.",
   "thread sam",
+  "thread *",
+  "snapshot",
 ]
 
 /** Deterministic command → policy mapping. A future agent would replace this. */
 export function parseCommand(input: string, context: { currentParagraphs: number[]; policies: Policies }): ParsedCommand | null {
-  const t = input.trim().toLowerCase()
+  const t = input.trim().replace(/^\/+\s*/, "").toLowerCase()
   if (!t) return null
   const held = context.policies.journal.heldBack
 
+  if (/^(snapshot|page|render)$/.test(t)) return { snapshot: true, reply: "page rendered" }
+  if (/^(?:thread|threads)\s+(\*|all|every)$/.test(t)) return { thread: "*", reply: "thread → every thread" }
   const th = /^(?:thread|go to|open)\s+([a-z0-9][a-z0-9 -]{0,24})$/.exec(t)
   if (th) return { thread: th[1].trim(), reply: `thread → ${th[1].trim()}` }
   if (/\breset\b|\bdefaults?\b|\bstart over\b/.test(t)) {

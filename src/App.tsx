@@ -6,16 +6,18 @@ import type { EventKind, EventType } from "./events/types"
 import { DEFAULT_FRAME, frameOf, reduce, type ObjType } from "./events/reducer"
 import { interpret, summarize } from "./interpretation/interpret"
 import { claimKey, type TendState } from "./interpretation/implications"
+import type { Interpretation } from "./interpretation/types"
 import { present } from "./projection/present"
-import { propose, implicationsFor } from "./projection/propose"
+import { propose, implicationsFor, type Proposal } from "./projection/propose"
 import { Frame } from "./projection/Frame"
+import { Digest, type DigestFrame } from "./projection/Digest"
 import type { BlockHandlers, CorrectionKind } from "./projection/Blocks"
 import { FORWARD_TIMELINE, flyTo, pageRect, runTimeline, type FlipSeed, type Phase } from "./projection/transition"
 import { CommandLine } from "./chat/CommandLine"
 import { EventInspector } from "./dev/EventInspector"
 import { describePolicies, parseCommand } from "./automation/policies"
 import { splitParagraphs } from "./interpretation/segment"
-import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, type BasisId } from "./frames"
+import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, isBound, matches, orderFrames, UNBOUND, type BasisId } from "./frames"
 
 export const DEMO_TEXT =
   "I slept kind of badly again and I think I stayed up too late scrolling. Work was fine but I kept avoiding the one thing I actually needed to finish. I felt better after walking to get coffee though. I should probably text Sam back because I've left that sitting for two days. I also keep thinking I want to do something different with my weekends instead of losing Saturday mornings."
@@ -25,10 +27,24 @@ const KEY_TYPES: Record<string, ObjType> = { a: "action", q: "question", r: "ref
 
 type Stage = "editing" | "structured"
 
+function hashIds(ids: string[]): string {
+  let h = 2166136261
+  for (const id of ids) for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return (h >>> 0).toString(36)
+}
+
 export function App() {
   const events = useSyncExternalStore(subscribe, getEvents)
   const [frameId, setFrameId] = useState(DEFAULT_FRAME)
-  const source = useMemo(() => reduce(events), [events])
+  /** The time cut: a page is the log before this index. null = now. */
+  const [cut, setCut] = useState<number | null>(null)
+  const visible = useMemo(() => (cut == null ? events : events.slice(0, cut)), [events, cut])
+  const source = useMemo(() => reduce(visible), [visible])
+  const coord = useMemo(() => parseFrameId(frameId), [frameId])
+  const bound = isBound(coord)
+  const threads = useMemo(() => threadsFrom(Object.keys(source.frames)), [source])
+
+  // A bound frame: one text, one interpretation.
   const frame = useMemo(() => frameOf(source, frameId), [source, frameId])
   const interp = useMemo(() => interpret(frame, source.policies), [frame, source.policies])
   const presentation = useMemo(() => present(interp, frame), [interp, frame])
@@ -50,6 +66,10 @@ export function App() {
   stageRef.current = stage
   const frameRef = useRef(frameId)
   frameRef.current = frameId
+  const eventsRef = useRef(events)
+  eventsRef.current = events
+  const cutRef = useRef(cut)
+  cutRef.current = cut
   const focusedRef = useRef<string | null>(null)
   focusedRef.current = focusedId
   const flipSeed = useRef<FlipSeed | null>(null)
@@ -57,9 +77,15 @@ export function App() {
   const idleTimer = useRef<number | null>(null)
   const cancelTimeline = useRef<() => void>(() => {})
 
-  const emit = useCallback((type: EventType, kind: EventKind, payload: Record<string, unknown>, objectId?: string) => {
-    appendEvent(type, kind, payload, { objectId, frame: frameRef.current })
+  const frozen = cut != null
+  const editable = bound && !frozen
+
+  const emitTo = useCallback((fid: string, type: EventType, kind: EventKind, payload: Record<string, unknown>, objectId?: string) => {
+    appendEvent(type, kind, payload, { objectId, frame: fid })
   }, [])
+  const emit = useCallback((type: EventType, kind: EventKind, payload: Record<string, unknown>, objectId?: string) => {
+    emitTo(frameRef.current, type, kind, payload, objectId)
+  }, [emitTo])
 
   const measureAll = useCallback((adapter: EditorAdapter) => {
     const src = reduce(getEvents())
@@ -103,7 +129,7 @@ export function App() {
   const write = useCallback(() => {
     const adapter = adapterRef.current
     const root = frameRoot.current
-    if (stageRef.current !== "structured") return
+    if (stageRef.current !== "structured" || cutRef.current != null) return
     cancelTimeline.current()
     if (adapter && root) {
       const { rects } = measureAll(adapter)
@@ -138,6 +164,8 @@ export function App() {
   }, [])
 
   const loadDemo = useCallback(() => {
+    if (!isBound(parseFrameId(frameRef.current))) return
+    setCut(null)
     const prev = frameOf(reduce(getEvents()), frameRef.current).text
     emit("human_event", "text_changed", { text: DEMO_TEXT, changes: [{ from: 0, to: prev.length, inserted: DEMO_TEXT }], source: "demo" })
     remount(DEMO_TEXT)
@@ -146,6 +174,7 @@ export function App() {
   const reset = useCallback(() => {
     resetLog()
     setLastReply(null)
+    setCut(null)
     setFrameId(DEFAULT_FRAME)
     frameRef.current = DEFAULT_FRAME
     remount("")
@@ -156,50 +185,62 @@ export function App() {
     appendEvent("human_event", "frame_visited", { from: frameRef.current, coordinate: parseFrameId(next) }, { frame: next })
     frameRef.current = next
     setFrameId(next)
-    remount(frameOf(reduce(getEvents()), next).text)
+    if (isBound(parseFrameId(next))) remount(frameOf(reduce(getEvents()), next).text)
+    else { cancelTimeline.current(); setStage("structured"); setPhase("idle") }
   }, [remount])
 
   /** Move one unit along one basis of the frame's coordinate. */
   const navigate = useCallback((basis: BasisId, delta: 1 | -1) => {
-    const threads = threadsFrom(Object.keys(reduce(getEvents()).frames))
-    goTo(coordId(step(parseFrameId(frameRef.current), basis, delta, threads)))
+    const ts = threadsFrom(Object.keys(reduce(getEvents()).frames))
+    goTo(coordId(step(parseFrameId(frameRef.current), basis, delta, ts)))
   }, [goTo])
 
-  // ---- tending, corrections, affordances ---------------------------------
-  const onTend = useCallback((key: string, state: TendState, reason: string) => {
+  // A page cut in the past, or a digest, is shown structured with no editor.
+  useEffect(() => {
+    if ((frozen || !bound) && stage === "editing") { cancelTimeline.current(); setStage("structured"); setPhase("idle") }
+  }, [frozen, bound, stage])
+
+  // ---- tending, corrections, affordances (per frame) ---------------------
+  const tendIn = useCallback((fid: string, key: string, state: TendState, reason: string) => {
+    if (cutRef.current != null) { setLastReply("this is a page · return to now to tend"); return }
     const kind: EventKind = state === "confirmed" ? "implication_confirmed" : state === "rejected" ? "implication_rejected" : "implication_deferred"
-    emit("user_correction", kind, { key, reason }, key.split("|")[0])
-  }, [emit])
+    emitTo(fid, "user_correction", kind, { key, reason }, key.split("|")[0])
+  }, [emitTo])
 
-  const onCorrection = useCallback((kind: CorrectionKind, objectId: string, payload: Record<string, unknown>) => {
+  const correctIn = useCallback((fid: string, kind: CorrectionKind, objectId: string, payload: Record<string, unknown>) => {
+    if (cutRef.current != null) return
     const map: Record<CorrectionKind, EventKind> = { unstructure: "user_unstructured", merge: "user_merged", split: "user_split" }
-    emit("user_correction", map[kind], payload, objectId)
-  }, [emit])
+    emitTo(fid, "user_correction", map[kind], payload, objectId)
+  }, [emitTo])
 
-  const pin = useCallback((objectId: string, pos: { x: number; y: number } | null) => {
-    emit("human_event", "block_pinned", pos ? { x: Math.round(pos.x), y: Math.round(pos.y) } : { x: null, y: null }, objectId)
-  }, [emit])
+  const pinIn = useCallback((fid: string, objectId: string, pos: { x: number; y: number } | null) => {
+    emitTo(fid, "human_event", "block_pinned", pos ? { x: Math.round(pos.x), y: Math.round(pos.y) } : { x: null, y: null }, objectId)
+  }, [emitTo])
 
-  const onAffordance = useCallback((objectId: string, action: string) => {
-    if (action === "make concrete") { onTend(claimKey(objectId, { kind: "type", type: "action" }), "confirmed", "make concrete"); return }
-    if (action === "unpin") { pin(objectId, null); return }
+  const affordIn = useCallback((fid: string, objectId: string, action: string) => {
+    if (cutRef.current != null) return
+    if (action === "make concrete") { tendIn(fid, claimKey(objectId, { kind: "type", type: "action" }), "confirmed", "make concrete"); return }
+    if (action === "unpin") { pinIn(fid, objectId, null); return }
     if (action === "connect") {
-      // Lift it into the plane, beside the flow, so it can be moved near something.
       const root = frameRoot.current, el = root?.querySelector<HTMLElement>(`[data-block="${objectId}"]`)
       const flow = root?.querySelector<HTMLElement>(".flow")
       if (root && el && flow) {
         const r = pageRect(el), fr = pageRect(root), fl = pageRect(flow)
         flipSeed.current = { rects: new Map([[objectId, pageRect(el.querySelector("[data-flip]")!)]]), releaseDelay: 0, stagger: 0, partial: true }
-        pin(objectId, { x: fl.left + fl.width - fr.left + 24, y: r.top - fr.top })
+        pinIn(fid, objectId, { x: fl.left + fl.width - fr.left + 24, y: r.top - fr.top })
       }
       return
     }
-    emit("human_event", "action_clicked", { action }, objectId)
-  }, [emit, onTend, pin])
+    emitTo(fid, "human_event", "action_clicked", { action }, objectId)
+  }, [emitTo, tendIn, pinIn])
+
+  const onTend = useCallback((key: string, state: TendState, reason: string) => tendIn(frameRef.current, key, state, reason), [tendIn])
+  const onCorrection = useCallback((kind: CorrectionKind, objectId: string, payload: Record<string, unknown>) => correctIn(frameRef.current, kind, objectId, payload), [correctIn])
+  const onAffordance = useCallback((objectId: string, action: string) => affordIn(frameRef.current, objectId, action), [affordIn])
 
   // ---- lift & drop: flow ↔ pinned ----------------------------------------
   const onLift = useCallback((e: React.PointerEvent, objectId: string) => {
-    if (e.button !== 0) return
+    if (e.button !== 0 || cutRef.current != null || !isBound(parseFrameId(frameRef.current))) return
     const root = frameRoot.current
     const el = root?.querySelector<HTMLElement>(`[data-block="${objectId}"]`)
     const flow = root?.querySelector<HTMLElement>(".flow")
@@ -225,15 +266,14 @@ export function App() {
       const fr = pageRect(root), fl = pageRect(flow)
       el.style.transform = ""
       el.classList.remove("lifting")
-      // Where the pointer let go decides: inside the flow column returns it to flow, outside pins it.
       const inFlow = px + window.scrollX < fl.left + fl.width
       flipSeed.current = { rects: new Map([[objectId, dropped]]), releaseDelay: 0, stagger: 0, partial: true }
-      if (inFlow) pin(objectId, null)
-      else pin(objectId, { x: blockRect.left - fr.left, y: blockRect.top - fr.top })
+      if (inFlow) pinIn(frameRef.current, objectId, null)
+      else pinIn(frameRef.current, objectId, { x: blockRect.left - fr.left, y: blockRect.top - fr.top })
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
-  }, [pin])
+  }, [pinIn])
 
   // ---- keyboard: the fifth input -----------------------------------------
   useEffect(() => {
@@ -241,6 +281,17 @@ export function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (inField(e.target)) return
       if (e.key === "/") { e.preventDefault(); setCmdFocus((n) => n + 1); return }
+      // Shift+arrows scrub the time cut: the same query rendered as of an earlier moment.
+      if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault()
+        const n = eventsRef.current.length
+        setCut((c) => {
+          if (e.key === "ArrowLeft") return Math.max(1, (c ?? n) - 1)
+          if (c == null) return null
+          return c + 1 >= n ? null : c + 1
+        })
+        return
+      }
       if (stageRef.current !== "structured") return
       if (e.key === " ") { e.preventDefault(); setRaw(true); return }
       if (e.key === "ArrowLeft") navigate("day", -1)
@@ -260,51 +311,88 @@ export function App() {
   }, [navigate, onTend, onCorrection])
 
   const onCommand = useCallback((text: string) => {
-    // goTo is stable; declared above
     const src = reduce(getEvents())
     const fr = frameOf(src, frameRef.current)
     const parsed = parseCommand(text, { currentParagraphs: splitParagraphs(fr.text).map((_, i) => i), policies: src.policies })
     if (!parsed) { setLastReply("no policy matches that · try a seed"); return }
+    if (parsed.snapshot) {
+      const vis = cutRef.current == null ? getEvents() : getEvents().slice(0, cutRef.current)
+      appendEvent("human_event", "page_rendered", { query: parseFrameId(frameRef.current), cut: vis.length, hash: hashIds(vis.map((e) => e.id)) }, { frame: frameRef.current })
+      setLastReply(`page rendered · ${parseFrameId(frameRef.current).day} · ${parseFrameId(frameRef.current).thread} · as of event ${vis.length}`)
+      return
+    }
     if (parsed.thread) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), thread: parsed.thread })); return }
+    if (!parsed.patch) return
     appendEvent("policy_change", "automation_policy_changed", { patch: parsed.patch, utterance: text, before: describePolicies(src.policies) })
     setLastReply(parsed.reply)
   }, [goTo])
 
   useEffect(() => () => cancelTimeline.current(), [])
 
-  const handlers: BlockHandlers = {
-    onTend, onCorrection, onAffordance, onLift, focusedId, setFocusedId,
-    proposalsFor: (id) => proposals.filter((p) => (p.shape === "toggle" && p.subject === id)),
-    implicationsFor: (id) => implicationsFor(interp, id),
-  }
+  const handlersFor = useCallback((fid: string, interpF: Interpretation, proposalsF: Proposal[]): BlockHandlers => ({
+    onTend: (key, state, reason) => tendIn(fid, key, state, reason),
+    onCorrection: (kind, objectId, payload) => correctIn(fid, kind, objectId, payload),
+    onAffordance: (objectId, action) => affordIn(fid, objectId, action),
+    onLift,
+    focusedId,
+    setFocusedId,
+    proposalsFor: (id) => proposalsF.filter((p) => p.shape === "toggle" && p.subject === id),
+    implicationsFor: (id) => implicationsFor(interpF, id),
+  }), [tendIn, correctIn, affordIn, onLift, focusedId])
 
-  const stageLabel = stage === "editing" ? (listening ? "reading" : "writing") : phase === "idle" ? (raw ? "raw" : "structured") : phase
-  const coord = parseFrameId(frameId)
+  const handlers = useMemo(() => handlersFor(frameId, interp, proposals), [handlersFor, frameId, interp, proposals])
+
+  // A digest: every concrete frame the query matches, each with its own reading.
+  const digest: DigestFrame[] = useMemo(() => {
+    if (bound) return []
+    const ids = orderFrames(Object.keys(source.frames).filter((id) => matches(coord, id) && source.frames[id].text.trim()), threads)
+    return ids.map((id) => {
+      const fr = source.frames[id]
+      const it = interpret(fr, source.policies)
+      const c = parseFrameId(id)
+      const parts = [coord.day === UNBOUND ? (relativeDay(c.day) ?? formatDay(c.day)) : null, coord.thread === UNBOUND ? c.thread : null].filter(Boolean)
+      return { id, label: parts.join(" · "), presentation: present(it, fr), handlers: handlersFor(id, it, propose(it, fr, source.policies)) }
+    })
+  }, [bound, source, coord, threads, handlersFor])
+
+  const stageLabel = frozen ? "page" : !bound ? "digest" : stage === "editing" ? (listening ? "reading" : "writing") : phase === "idle" ? (raw ? "raw" : "structured") : phase
   const dayLabel = relativeDay(coord.day) ?? formatDay(coord.day)
+  const threadLabel = coord.thread === UNBOUND ? "every thread" : coord.thread
+  const timeLabel = cut == null ? "now" : `${events.length - cut} events ago`
+  const title = [
+    { basis: "day", label: dayLabel, detail: formatDay(coord.day) },
+    { basis: "thread", label: threadLabel, detail: "thread" },
+    { basis: "time", label: timeLabel, detail: cut == null ? "the log as it is now" : `the log cut at event ${cut} of ${events.length}` },
+  ]
 
   return (
     <div className={`app stage-${stage}`}>
       <header className="topbar generated">
-        <span className="brand">malleable paper · <span className="coord-day">{dayLabel}</span> · <span className="coord-thread">{coord.thread}</span> · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
+        <span className="brand">malleable paper · <span className="coord-day">{dayLabel}</span> · <span className="coord-thread">{threadLabel}</span> · <span className="coord-time">{timeLabel}</span> · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
         <span className="controls">
           <button className="ghost" onClick={loadDemo}>load demo</button>
           <button className="ghost" onClick={reset}>reset</button>
-          <span className="hint">space holds raw · / steers · arrows move frames</span>
+          <span className="hint">space raw · / steer · arrows frames · ⇧arrows time</span>
         </span>
       </header>
 
       <main className="plane">
         <div className={`frame-host ${stage}`}>
-          <WordgardEditor key={docKey} docKey={docKey} initialText={initialText.current} hidden={stage !== "editing"} onChange={onEditorChange} onReady={onEditorReady} />
-          {stage === "structured" && (
+          {bound && (
+            <WordgardEditor key={docKey} docKey={docKey} initialText={initialText.current} hidden={stage !== "editing" || !editable} onChange={onEditorChange} onReady={onEditorReady} />
+          )}
+          {bound && stage === "structured" && (
             <Frame
               presentation={presentation} interp={interp} proposals={proposals} frame={frame}
               phase={phase} raw={raw} flipSeed={flipSeed} rootRef={frameRoot}
               handlers={handlers} onNavigate={navigate} onWrite={write} onTend={onTend}
-              title={[{ basis: "day", label: dayLabel, detail: formatDay(coord.day) }, { basis: "thread", label: coord.thread, detail: "thread" }]}
+              title={title} frozen={frozen}
             />
           )}
-          {stage === "editing" && !frame.text.trim() && (
+          {!bound && (
+            <Digest frames={digest} title={title} rootRef={frameRoot} flipSeed={flipSeed} onNavigate={navigate} frozen={frozen} />
+          )}
+          {editable && stage === "editing" && !frame.text.trim() && (
             <div className="empty-hint generated">
               type a messy paragraph, or <button className="link" onClick={loadDemo}>load the demo</button> · pause two seconds and the paper writes back
             </div>
@@ -313,7 +401,7 @@ export function App() {
         <CommandLine policies={source.policies} lastReply={lastReply} onCommand={onCommand} focusSignal={cmdFocus} />
       </main>
 
-      <EventInspector events={events} interp={interp} presentation={presentation} proposals={proposals} frameId={`${dayLabel} · ${coord.thread}`} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
+      <EventInspector events={visible} interp={interp} presentation={presentation} proposals={proposals} frameId={`${dayLabel} · ${threadLabel} · ${timeLabel}`} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
     </div>
   )
 }

@@ -19,6 +19,7 @@ export function CommandLine({ policies, lastReply, onCommand, focusSignal }: Pro
     if (!t) return
     onCommand(t)
     setDraft("")
+    input.current?.blur()
   }
   return (
     <div className={`command ${focused ? "focused" : ""}`}>

@@ -71,7 +71,7 @@ function step(s: SourceState, ev: LogEvent, index: number): SourceState {
       return withFrame(s, frame, (fr) => ({ ...fr, text: tp.text, lastTextAt: index }))
     }
     case "frame_visited":
-      return withFrame(s, frame, (fr) => fr)
+      return frame.includes("*") ? s : withFrame(s, frame, (fr) => fr)
 
     case "implication_confirmed":
       return withFrame(s, frame, (fr) => tend(fr, p.key, "confirmed", ev.ts))
@@ -121,6 +121,7 @@ function step(s: SourceState, ev: LogEvent, index: number): SourceState {
 
     case "implications_ran":
     case "interpretation_ran":
+    case "page_rendered":
       return s // instrumentation only, never authoritative
     default:
       return s

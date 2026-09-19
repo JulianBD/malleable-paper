@@ -13,6 +13,7 @@ export type EventKind =
   | "block_pinned" // {x, y} pins an object in the frame; {x: null} returns it to flow
   | "action_clicked"
   | "frame_visited"
+  | "page_rendered" // a snapshot: {query, cut, hash}; the page is the log prefix before cut, rendered for the query
   // tending an implication (key = subject|claim)
   | "implication_confirmed"
   | "implication_rejected"

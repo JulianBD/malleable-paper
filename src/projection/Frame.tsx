@@ -25,16 +25,18 @@ interface Props {
   onTend: BlockHandlers["onTend"]
   /** The coordinate, one entry per basis, rendered as the frame's title. */
   title: Array<{ basis: string; label: string; detail: string }>
+  /** A page cut in the past is immutable: no write, no proposals acted on. */
+  frozen?: boolean
 }
 
-export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend, title }: Props) {
+export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend, title, frozen }: Props) {
   useFlip(rootRef, flipSeed, [presentation])
   const showReplica = phase === "lift" || phase === "move" || phase === "return" || raw
   const soundboard = proposals.find((p) => p.shape === "soundboard")
   const flowRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div ref={rootRef} className={`frame phase-${phase} ${raw ? "raw" : ""}`}>
+    <div ref={rootRef} className={`frame phase-${phase} ${raw ? "raw" : ""} ${frozen ? "frozen" : ""}`}>
       <button className="arrow arrow-up generated" onClick={() => onNavigate("thread", -1)} title="previous thread"><span>↑</span><em>thread</em></button>
       <button className="arrow arrow-left generated" onClick={() => onNavigate("day", -1)} title="the day before"><span>←</span><em>day</em></button>
       <button className="arrow arrow-right generated" onClick={() => onNavigate("day", 1)} title="the day after"><span>→</span><em>day</em></button>
@@ -53,7 +55,7 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
               <span key={t.basis} className={`coord coord-${t.basis}`} title={t.detail}>{i > 0 && <span className="sep">·</span>}{t.label}</span>
             ))}
           </h2>
-          <button className="ghost generated" onClick={onWrite}>write</button>
+          {frozen ? <span className="generated frozen-tag">page · immutable</span> : <button className="ghost generated" onClick={onWrite}>write</button>}
         </div>
         {presentation.sections.map((s) => <SectionView key={s.id} section={s} h={handlers} />)}
         {soundboard && soundboard.shape === "soundboard" && (
@@ -104,7 +106,18 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
   )
 }
 
-function SectionView({ section, h }: { section: Section; h: BlockHandlers }) {
+/** Title tuple shared by Frame and Digest. */
+export function Tuple({ title }: { title: Array<{ basis: string; label: string; detail: string }> }) {
+  return (
+    <h2 className="title generated tuple">
+      {title.map((t, i) => (
+        <span key={t.basis} className={`coord coord-${t.basis}`} title={t.detail}>{i > 0 && <span className="sep">·</span>}{t.label}</span>
+      ))}
+    </h2>
+  )
+}
+
+export function SectionView({ section, h }: { section: Section; h: BlockHandlers }) {
   return (
     <section className={`sec sec-${section.kind}`} data-section={section.id}>
       {section.label && <Heading label={section.label} sectionId={section.id} />}
