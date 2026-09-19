@@ -1,113 +1,126 @@
 import type { LogEvent, TextChangedPayload } from "./types"
 import { DEFAULT_POLICIES, applyPolicyPatch, type Policies, type PolicyPatch } from "../automation/policies"
+import { claimKey, nearKey, type Tends } from "../interpretation/implications"
 
 export type ObjType = "note" | "question" | "reflection" | "intention" | "action" | "reference"
 export const OBJ_TYPES: ObjType[] = ["note", "question", "reflection", "intention", "action", "reference"]
 
+/** Edits to segmentation. These change what the subjects are, so they are not claims. */
 export interface Correction {
   objectId: string
-  rejectedTypes: ObjType[]
-  explicitType?: ObjType
   unstructured?: boolean
-  mergedInto?: string // id of the previous object this one was combined with
-  splitAt?: number // offset inside the object's source text
+  mergedInto?: string
+  splitAt?: number
 }
 
-export interface SpatialState {
-  positions: Record<string, { x: number; y: number }>
-  connections: Array<[string, string]>
-  groupedUnder: Record<string, string> // childId -> parentId (round-trips into the document)
+export interface FrameState {
+  id: string
+  text: string
+  corrections: Record<string, Correction>
+  tends: Tends
+  statuses: Record<string, string>
+  /** Pinned placements. An object absent here is in flow. */
+  pinned: Record<string, { x: number; y: number }>
+  nextMovesDismissedAt: number // event index; -1 = not dismissed
+  lastTextAt: number
 }
 
 export interface SourceState {
-  text: string
-  corrections: Record<string, Correction>
+  frames: Record<string, FrameState>
   policies: Policies
-  statuses: Record<string, string> // objectId -> "done" | "later" | "kept" | ...
-  nextMovesDismissed: boolean
-  spatial: SpatialState
   eventCount: number
 }
 
-export const EMPTY_SOURCE: SourceState = {
-  text: "",
-  corrections: {},
-  policies: DEFAULT_POLICIES,
-  statuses: {},
-  nextMovesDismissed: false,
-  spatial: { positions: {}, connections: [], groupedUnder: {} },
-  eventCount: 0,
+export const DEFAULT_FRAME = "0,0"
+
+export function emptyFrame(id: string): FrameState {
+  return { id, text: "", corrections: {}, tends: {}, statuses: {}, pinned: {}, nextMovesDismissedAt: -1, lastTextAt: -1 }
 }
 
-function correction(state: SourceState, id: string): Correction {
-  return state.corrections[id] ?? { objectId: id, rejectedTypes: [] }
+export const EMPTY_SOURCE: SourceState = { frames: {}, policies: DEFAULT_POLICIES, eventCount: 0 }
+
+export function frameOf(s: SourceState, id: string = DEFAULT_FRAME): FrameState {
+  return s.frames[id] ?? emptyFrame(id)
 }
 
 /** Pure fold: events → source state. Inference events are ignored on purpose. */
 export function reduce(events: LogEvent[]): SourceState {
-  let s: SourceState = { ...EMPTY_SOURCE, corrections: {}, statuses: {}, spatial: { positions: {}, connections: [], groupedUnder: {} } }
-  for (const ev of events) {
-    s = step(s, ev)
-  }
+  let s: SourceState = { frames: {}, policies: DEFAULT_POLICIES, eventCount: 0 }
+  events.forEach((ev, i) => {
+    s = step(s, ev, i)
+  })
   return { ...s, eventCount: events.length }
 }
 
-function step(s: SourceState, ev: LogEvent): SourceState {
+function withFrame(s: SourceState, id: string, f: (fr: FrameState) => FrameState): SourceState {
+  return { ...s, frames: { ...s.frames, [id]: f(frameOf(s, id)) } }
+}
+
+function tend(fr: FrameState, key: string, state: "confirmed" | "rejected" | "deferred", ts: number): FrameState {
+  return { ...fr, tends: { ...fr.tends, [key]: { state, ts } } }
+}
+
+function step(s: SourceState, ev: LogEvent, index: number): SourceState {
   const p = ev.payload as Record<string, any>
+  const frame = ev.frame ?? DEFAULT_FRAME
+  const id = ev.objectId
   switch (ev.kind) {
     case "text_changed": {
       const tp = ev.payload as unknown as TextChangedPayload
-      // A text change re-opens next moves and resets transient statuses.
-      return { ...s, text: tp.text, nextMovesDismissed: false }
+      return withFrame(s, frame, (fr) => ({ ...fr, text: tp.text, lastTextAt: index }))
     }
-    case "user_rejected_type": {
-      const c = correction(s, ev.objectId!)
-      const rejected = c.rejectedTypes.includes(p.type) ? c.rejectedTypes : [...c.rejectedTypes, p.type]
-      return { ...s, corrections: { ...s.corrections, [c.objectId]: { ...c, rejectedTypes: rejected, explicitType: undefined } } }
-    }
-    case "user_confirmed_type": {
-      const c = correction(s, ev.objectId!)
-      return { ...s, corrections: { ...s.corrections, [c.objectId]: { ...c, explicitType: p.type, unstructured: false } } }
-    }
-    case "user_unstructured": {
-      const c = correction(s, ev.objectId!)
-      return { ...s, corrections: { ...s.corrections, [c.objectId]: { ...c, unstructured: p.value !== false } } }
-    }
-    case "user_merged": {
-      const c = correction(s, ev.objectId!)
-      return { ...s, corrections: { ...s.corrections, [c.objectId]: { ...c, mergedInto: p.previousId } } }
-    }
-    case "user_split": {
-      const c = correction(s, ev.objectId!)
-      return { ...s, corrections: { ...s.corrections, [c.objectId]: { ...c, splitAt: p.at } } }
-    }
+    case "frame_visited":
+      return withFrame(s, frame, (fr) => fr)
+
+    case "implication_confirmed":
+      return withFrame(s, frame, (fr) => tend(fr, p.key, "confirmed", ev.ts))
+    case "implication_rejected":
+      return withFrame(s, frame, (fr) => tend(fr, p.key, "rejected", ev.ts))
+    case "implication_deferred":
+      return withFrame(s, frame, (fr) => tend(fr, p.key, "deferred", ev.ts))
+
+    // legacy correction kinds map onto tends of type claims
+    case "user_rejected_type":
+      return withFrame(s, frame, (fr) => tend(fr, claimKey(id!, { kind: "type", type: p.type }), "rejected", ev.ts))
+    case "user_confirmed_type":
+      return withFrame(s, frame, (fr) => tend(fr, claimKey(id!, { kind: "type", type: p.type }), "confirmed", ev.ts))
+    case "blocks_connected":
+      return withFrame(s, frame, (fr) => tend(fr, nearKey(p.a, p.b), "confirmed", ev.ts))
+    case "block_grouped":
+      return p.parentId ? withFrame(s, frame, (fr) => tend(fr, claimKey(id!, { kind: "parent", parentId: p.parentId }), "confirmed", ev.ts)) : s
+
+    case "user_unstructured":
+      return withFrame(s, frame, (fr) => ({ ...fr, corrections: { ...fr.corrections, [id!]: { ...(fr.corrections[id!] ?? { objectId: id! }), unstructured: p.value !== false } } }))
+    case "user_merged":
+      return withFrame(s, frame, (fr) => ({ ...fr, corrections: { ...fr.corrections, [id!]: { ...(fr.corrections[id!] ?? { objectId: id! }), mergedInto: p.previousId } } }))
+    case "user_split":
+      return withFrame(s, frame, (fr) => ({ ...fr, corrections: { ...fr.corrections, [id!]: { ...(fr.corrections[id!] ?? { objectId: id! }), splitAt: p.at } } }))
+
     case "action_clicked": {
-      if (p.action === "dismiss_next_moves") return { ...s, nextMovesDismissed: true }
-      if (!ev.objectId) return s
-      const statuses = { ...s.statuses }
-      if (p.action === "clear") delete statuses[ev.objectId]
-      else statuses[ev.objectId] = p.action
-      return { ...s, statuses }
+      if (p.action === "dismiss_next_moves") return withFrame(s, frame, (fr) => ({ ...fr, nextMovesDismissedAt: index }))
+      if (!id) return s
+      return withFrame(s, frame, (fr) => {
+        const statuses = { ...fr.statuses }
+        if (p.action === "clear") delete statuses[id]
+        else statuses[id] = p.action
+        return { ...fr, statuses }
+      })
     }
-    case "automation_policy_changed": {
+    case "automation_policy_changed":
       return { ...s, policies: applyPolicyPatch(s.policies, p.patch as PolicyPatch) }
-    }
-    case "block_moved": {
-      return { ...s, spatial: { ...s.spatial, positions: { ...s.spatial.positions, [ev.objectId!]: { x: p.x, y: p.y } } } }
-    }
-    case "blocks_connected": {
-      const pair: [string, string] = [p.a, p.b]
-      const exists = s.spatial.connections.some(([a, b]) => (a === p.a && b === p.b) || (a === p.b && b === p.a))
-      return exists ? s : { ...s, spatial: { ...s.spatial, connections: [...s.spatial.connections, pair] } }
-    }
-    case "block_grouped": {
-      const groupedUnder = { ...s.spatial.groupedUnder }
-      if (p.parentId) groupedUnder[ev.objectId!] = p.parentId
-      else delete groupedUnder[ev.objectId!]
-      return { ...s, spatial: { ...s.spatial, groupedUnder } }
-    }
+
+    case "block_pinned":
+    case "block_moved":
+      return withFrame(s, frame, (fr) => {
+        const pinned = { ...fr.pinned }
+        if (p.x == null) delete pinned[id!]
+        else pinned[id!] = { x: p.x, y: p.y }
+        return { ...fr, pinned }
+      })
+
+    case "implications_ran":
     case "interpretation_ran":
-      return s // system inference is observability only, never authoritative
+      return s // instrumentation only, never authoritative
     default:
       return s
   }

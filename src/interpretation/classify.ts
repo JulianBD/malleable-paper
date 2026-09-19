@@ -1,5 +1,6 @@
 import type { ObjType } from "../events/reducer"
 import type { Policies } from "../automation/policies"
+import type { Intent } from "./implications"
 
 export interface Candidate {
   type: ObjType
@@ -83,4 +84,19 @@ export const TOPICS: Array<{ id: string; label: string; re: RegExp }> = [
 export function topicFor(text: string): { id: string; label: string } | null {
   for (const t of TOPICS) if (t.re.test(text)) return { id: t.id, label: t.label }
   return null
+}
+
+/** What a clause plausibly wants. Shown as a question, never a statement. */
+export function intents(text: string, type: ObjType): Array<{ intent: Intent; score: number; why: string }> {
+  const t = text.trim()
+  const c: Array<{ intent: Intent; score: number; why: string }> = []
+  if (type === "action") c.push({ intent: "resolve", score: 0.8, why: "reads as something to do" })
+  if (type === "question") { c.push({ intent: "decide", score: 0.7, why: "asks" }); c.push({ intent: "resolve", score: 0.6, why: "asks" }) }
+  if (/(i keep thinking|i want to|i wonder|i'd like to|been thinking)/i.test(t)) { c.push({ intent: "decide", score: 0.5, why: "keeps returning to it" }); c.push({ intent: "vent", score: 0.4, why: "may just be saying it" }) }
+  if (/(remember|note to self|don'?t forget)/i.test(t)) c.push({ intent: "remember", score: 0.8, why: "says remember" })
+  if (FEELING.test(t)) c.push({ intent: "record", score: 0.7, why: "describes how it went" })
+  c.push({ intent: "record", score: 0.5, why: "default for a journal" })
+  const best = new Map<Intent, { intent: Intent; score: number; why: string }>()
+  for (const x of c) { const p = best.get(x.intent); if (!p || x.score > p.score) best.set(x.intent, x) }
+  return [...best.values()].sort((a, b) => b.score - a.score)
 }

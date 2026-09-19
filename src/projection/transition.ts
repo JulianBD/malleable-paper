@@ -4,7 +4,6 @@
 // motion: high confidence moves decisively, low confidence moves slowly.
 
 import { useLayoutEffect, useRef, type MutableRefObject, type RefObject } from "react"
-import { motionFor } from "./project"
 
 export type Phase = "idle" | "lift" | "move" | "settle" | "label" | "affordance" | "return"
 
@@ -13,6 +12,15 @@ export interface FlipSeed {
   rects: Map<string, DOMRect>
   releaseDelay: number
   stagger: number
+  /** When true the seed overrides only the given ids; other ids keep their last rect. */
+  partial?: boolean
+}
+
+/** Motion parameters derived from confidence. Lower confidence moves slower and settles softer. */
+export function motionFor(confidence: number): { duration: number; easing: string } {
+  if (confidence >= 0.8) return { duration: 520, easing: "cubic-bezier(.2,.8,.2,1)" }
+  if (confidence >= 0.65) return { duration: 640, easing: "cubic-bezier(.3,.7,.2,1)" }
+  return { duration: 820, easing: "cubic-bezier(.4,.5,.3,1)" }
 }
 
 // "lift" is set synchronously when the projection mounts; the rest is timed.
@@ -48,7 +56,7 @@ export function useFlip(container: RefObject<HTMLElement | null>, seedRef: Mutab
     if (!root) return
     const seed = seedRef.current
     seedRef.current = null
-    const prev = seed ? seed.rects : last.current
+    const prev = seed ? (seed.partial ? new Map([...last.current, ...seed.rects]) : seed.rects) : last.current
     const releaseDelay = seed ? seed.releaseDelay : 0
     const stagger = seed ? seed.stagger : 18
     const isInitial = initial.current

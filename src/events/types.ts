@@ -1,25 +1,36 @@
 // The event log is the only authoritative state in the prototype.
-// Everything else (interpretation, projection) is derived from it.
+// Everything else (implications, presentation, proposals) is derived from it.
 
 export type EventType =
-  | "human_event" // authored text, clicks, spatial moves
-  | "user_correction" // the human corrected an inference
-  | "policy_change" // the human steered the automation via chat
+  | "human_event" // authored text, clicks, drags, tends
+  | "user_correction" // the human tended an implication or edited segmentation
+  | "policy_change" // the human tended an agent intention via the command line
   | "system_inference" // recorded for observability; never authoritative
-  | "schema_proposal" // reserved; unused in this prototype
 
 export type EventKind =
+  // data: what happened
   | "text_changed"
-  | "user_rejected_type"
-  | "user_confirmed_type"
+  | "block_pinned" // {x, y} pins an object in the frame; {x: null} returns it to flow
+  | "action_clicked"
+  | "frame_visited"
+  // tending an implication (key = subject|claim)
+  | "implication_confirmed"
+  | "implication_rejected"
+  | "implication_deferred"
+  // segmentation edits (not claims: they change what the subjects are)
   | "user_unstructured"
   | "user_merged"
   | "user_split"
-  | "action_clicked"
+  // tending an agent intention
   | "automation_policy_changed"
+  // instrumentation
+  | "implications_ran"
+  // legacy kinds kept so old logs still replay
+  | "user_rejected_type"
+  | "user_confirmed_type"
   | "block_moved"
-  | "block_grouped"
   | "blocks_connected"
+  | "block_grouped"
   | "interpretation_ran"
 
 export interface TextChange {
@@ -33,6 +44,8 @@ export interface LogEvent {
   ts: number
   eventType: EventType
   kind: EventKind
+  /** Frame the event belongs to ("x,y"). Absent for global events such as policy. */
+  frame?: string
   objectId?: string
   payload: Record<string, unknown>
 }

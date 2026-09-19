@@ -1,11 +1,12 @@
 # Malleable paper — a paper that can write back
 
-A UX prototype of one interaction: you write a messy paragraph on something that
-feels like paper; after a two-second pause your **exact words** visibly lift out
-of the paragraph and settle into a more operable structure; generated headings and
-actions appear only after your material has moved; you can correct one bad
-interpretation and steer the automation from a narrow chat panel; an append-only
-event log underneath explains every change.
+A UX prototype of one interaction. You write a messy paragraph on something that
+feels like paper. After a two-second pause your **exact words** lift out of the
+paragraph and settle into a more operable structure. Generated headings and
+proposals appear only after your material has moved. You tend the paper's
+implications (yes, no, later), you steer its intentions from one quiet command
+line, you drag a phrase out of the flow to pin it on the plane, and an
+append-only event log underneath explains every change.
 
 It is a prototype of the interaction model, not of an architecture.
 
@@ -14,235 +15,211 @@ It is a prototype of the interaction model, not of an architecture.
 ```bash
 bun install
 bun run dev        # http://localhost:5173
-bun test           # interpreter + projection + policy tests
+bun test           # reader, doer, tending and policy tests
 bun run typecheck
 ```
 
-Click **Load demo**, wait two seconds, watch. Then: hover a block and press **⋯**
-to correct it; click a seed command in the *Steering* panel; open the **Event log**
-drawer at the bottom; try **Spatial**. **Reset** clears the log.
+Click **load demo** and wait. Then: hover a block and press **⋯** or a letter
+(`a q r i n f` set the type, `Esc` leaves it as written); press **/** and type a
+command; hold **Space** to see the paragraph under the structure; drag a phrase
+to the right of the column to pin it; drag another near it; use the margin
+arrows or the arrow keys to move to an adjacent frame; open **log** at the
+bottom. **reset** clears the log.
 
 ## The editor: Wordgard, not "Midgard"
 
-The brief asked for "Midgard" from the Obsidian GitHub organization. No such package
-exists on npm, jsr, or (as far as the sandbox's network policy allowed) GitHub. The
-project meant is Marijn Haverbeke's ProseMirror successor, which is published as
-**`wordgard`** (this prototype uses `wordgard@0.5.2`, MIT). The API used, all read
-from the package's own `.d.ts` files, is:
+The brief asked for "Midgard". No such package exists on npm, jsr, or the Obsidian
+GitHub organization. The project meant is Marijn Haverbeke's ProseMirror successor,
+published as **`wordgard`** (`0.5.2`, MIT). The API used, read from the package's
+own `.d.ts` files:
 
 | import | used for |
 |---|---|
 | `Wordgard.create({ parent, doc, config })` from `wordgard/editor` | mounting the editor |
-| `Wordgard.updateListener.of(update => …)` | append-only capture of every document transaction (`update.docChanged`, `update.changes.iterChanges`) |
-| `wg.state.doc.iterate(...)`, `Leaf.param`, `Plot.isTextblock` from `wordgard/doc` | building plain text + an offset→position table |
-| `wg.domAtPos(pos)` + a DOM `Range` | measuring where an authored span sits on screen (source rects for the animation) |
-| `blockDoc()`, `paragraph()`, `lineBreak()` from `wordgard/schema`; `history()`; `placeholder()` | the smallest schema that gives paragraphs, undo, and a placeholder |
+| `Wordgard.updateListener.of(update => …)` | append-only capture of every document transaction |
+| `doc.iterate(...)`, `Leaf.param`, `Plot.isTextblock` from `wordgard/doc` | plain text + an offset→position table |
+| `wg.domAtPos(pos)` + a DOM `Range` | where an authored span sits on screen (source rects for the animation) |
+| `blockDoc()`, `paragraph()`, `lineBreak()`, `history()`, `placeholder()` | the smallest schema with paragraphs, undo and a placeholder |
 
 Wordgard owns text entry, positions, transactions, selection and undo. Nothing
-semantic is stored in its document: the interpreter reads plain text and returns
-ranges. The whole integration is one file, `src/editor/WordgardEditor.tsx`, behind a
-three-method `EditorAdapter` interface (`getText`, `measureRange`, `focus`).
+semantic lives in its document. The integration is `src/editor/WordgardEditor.tsx`
+behind a three-method `EditorAdapter` (`getText`, `measureRange`, `focus`).
 
-## Architecture
+## The model: two loops, one list
+
+The human and the agent each run two processes in parallel. A **reader** infers
+from data. A **doer** acts on an intention. They interlock through two shared
+stores: the **event log** (data) and the **implication list** (inference).
 
 ```
-            human types / clicks / drags / chats
-                          │
-                          ▼
-   ┌──────────────────────────────────────────────┐
-   │  EVENT LOG   (append-only, in memory,        │   authoritative
-   │  mirrored to localStorage)                   │
-   │  human_event · user_correction ·             │
-   │  policy_change · system_inference            │
-   └──────────────────────────────────────────────┘
-                          │ reduce()  (pure fold)
-                          ▼
-              SourceState { text, corrections,
-                            policies, statuses, spatial }
-                          │ interpret()  (pure, deterministic; the LLM/agent seam)
-                          ▼
-              Interpretation { objects[{ id, sourceText, sourceRange,
-                               displayRange, inferredType, confidence,
-                               groupId, parentId, … }], groups, glue }
-                          │ project()  (pure)
-                          ▼
-              Projection { sections, blocks, treatments,
-                           affordances, nextMoves }
-                          │
-            ┌─────────────┴──────────────┐
-   DocumentProjection.tsx        SpatialProjection.tsx
-   (FLIP animation, correction   (drag, proximity → offer)
-    menu, affordances)
+             human doer ──── types · drags · tends · steers ────┐
+                                                                ▼
+   ┌────────────────────────────────────────────────────────────────────┐
+   │  EVENT LOG   append-only, per frame, mirrored to localStorage      │  authoritative
+   │  human_event · user_correction · policy_change · system_inference  │
+   └────────────────────────────────────────────────────────────────────┘
+                                │ reduce()            pure fold
+                                ▼
+                FrameState { text, tends, corrections, pinned, statuses }
+                Policies   { …, heldBack: agent intentions switched off }
+                                │
+        agent reader ───────────┤ interpret()  = interpreter + scanner producers
+                                ▼
+   ┌────────────────────────────────────────────────────────────────────┐
+   │  IMPLICATION LIST   key = subject|claim · confidence · basis ·     │  derived,
+   │  state ∈ proposed · confirmed · rejected · deferred · superseded   │  running
+   │  claims: type · group · parent · near · intent                     │
+   └────────────────────────────────────────────────────────────────────┘
+                 │ present()  (reader half)        │ propose()  (doer half)
+                 ▼                                 ▼
+        Presentation                        Proposals
+        sections, blocks, nesting,          toggle · soundboard · connect · nest,
+        pinned blocks, treatment            each the UI form of one implication
+                 └──────────── Frame.tsx ──────────┘
+                          human reader
 ```
 
-Files: `src/events/` (types, store, reducer), `src/interpretation/` (segment,
-classify, interpret), `src/projection/` (project, transition, Document/Spatial),
-`src/automation/policies.ts` (policy state + chat command parser),
-`src/chat/Collaborator.tsx`, `src/dev/EventInspector.tsx`, `src/App.tsx`.
+Files: `src/events/` (types, store, reducer), `src/interpretation/`
+(segment, classify, interpret, scanner, implications), `src/projection/`
+(present, propose, Frame, Blocks, transition), `src/automation/policies.ts`,
+`src/chat/CommandLine.tsx`, `src/dev/EventInspector.tsx`, `src/App.tsx`.
+
+### What each stage needs to see
+
+| stage | who | needs access to | gets it from |
+|---|---|---|---|
+| infer from data | agent reader | the text, the human's tends, segmentation edits, pinned geometry, the policies that change what counts as an action | `FrameState` + `Policies` |
+| infer from data | human reader | the presentation, and on demand: why (hover a marker), the source (hold Space), the list itself (⋯ menu, log drawer) | `Frame.tsx`, `Replica`, `EventInspector` |
+| choose an intention | agent doer | the implication list with states, and its own tended intention set | `interp.implications`, `policies.journal.heldBack` |
+| choose an intention | human | the agent's intent claims about them, shown as questions, and the agent's intentions, shown as policy | `clarify` line, `.policies` line |
+| act | agent | nothing beyond the list: an action is a proposal, which is a rendering of one implication | `propose()` |
+| act | human | the targets: blank space, span, object, label, group, relation, margin arrow, proposal, selection | `Blocks.tsx`, `Frame.tsx` |
+| record | both | an append-only log with the frame id on every event | `appendEvent` |
 
 ### Authoritative vs derived
 
 | | what | where |
 |---|---|---|
-| **Authoritative** | the event log: every text change (with the snapshot text), every correction, every policy change, clicks, spatial moves | `events/store.ts` |
-| **Derived, recomputed on every event** | `SourceState`, `Interpretation`, `Projection` | `reduce` → `interpret` → `project` |
-| **Recorded but never authoritative** | `interpretation_ran` events (`eventType: system_inference`) — written for the inspector so the causal chain is visible; the reducer ignores them | `App.structure()` |
-| **Ephemeral** | chat transcript, animation phase, view toggle | React state |
+| **authoritative** | every text change (with its snapshot), every tend, every segmentation edit, every pin, every policy change, every frame visit | `events/store.ts` |
+| **derived on every event** | `FrameState`, `Interpretation` (objects + implication list), `Presentation`, `Proposals` | `reduce` → `interpret` → `present` · `propose` |
+| **instrumentation, never authoritative** | `implications_ran` (`eventType: system_inference`) so the drawer shows the chain | `App.structure()` |
+| **ephemeral** | stage, animation phase, raw-hold, focused block, last reply | React state |
 
-A correction is an event (`user_rejected_type`, `user_confirmed_type`,
-`user_unstructured`, `user_merged`, `user_split`). The reducer turns it into a
-constraint keyed by object id; the interpreter honours the constraint on every
-recompute, so the same inference is not made again and it survives reload.
+A tend is durable. `implication_rejected` on `obj-7|type=action` means that claim is
+never proposed again for that subject; `implication_deferred` on `obj-7|intent=resolve`
+removes its next move until a producer revises it. Old logs replay: the five
+original correction kinds map onto tends of type, near and parent claims.
 
 ### The three classes of UI content
 
-* **Authored** — every phrase in a block, every next-move button label, and the
-  headings *felt better after* and *keep thinking* are exact substrings of the
-  source, rendered in the serif. The tests assert this for every object and label.
-* **Derived presentation** — grouping, order, nesting, bullets, colour, italic
-  headings, indentation. Owned by `project()` and CSS.
-* **Generated language** — always sans-serif, small, muted: section labels such as
-  *Sleep*, *Work*, *Open*, the six affordance verbs, the clarification question
-  *Is this an action?*, chat replies. No summaries, no advice, no paraphrase.
-
-A displayed phrase may be a sub-range of its clause (`displayRange ⊂ sourceRange`):
-"I should probably text Sam back" is shown as "text Sam back". The dropped words
-are "glue"; they fade in place during the animation and are all still there under
-**Raw**.
+* **Authored** — every phrase in a block, every next-move label, the headings *felt
+  better after* and *keep thinking*: exact substrings of the source, in roman
+  serif. The tests assert it for every object and label.
+* **Derived presentation** — grouping, order, nesting, bullets, colour, italics,
+  indentation, pinned placement.
+* **Generated language** — small caps in the same serif, muted: section labels
+  such as *Sleep*, the affordance verbs, the clarification *an action?*, command
+  replies. No summaries, no advice, no paraphrase.
 
 ## Demo flows
 
-1. **Brain dump → visible restructuring.** Load demo. After ~1 s (2 s when typing)
-   the paragraph's spans highlight, lift, and fly into *Sleep / Work / felt better
-   after / Open*; connectives fade; markers and colour settle; then *Today* and the
-   generated headings fade in; then the affordances and *Possible next moves*.
-2. **Correction.** *want to do something different with my weekends* is inferred as
-   a soft action (confidence 0.62, shown tentative with *Is this an action? yes/no*).
-   Press **no** (or ⋯ → *Not an action*): the block leaves *Open* and settles under
-   the authored heading *keep thinking* as a reflection; its next-move button
-   disappears; `user_rejected_type` is in the log.
-3. **Steering.** Type or click *Don't turn casual thoughts into tasks.* The reply
-   shows the policy patch; an `automation_policy_changed` event is appended; *Open*
-   becomes *Intentions* with ◇ markers and no next moves. Also seeded: *Be more
-   subtle…*, *Only surface things that sound explicitly unresolved*, *Treat this
-   paragraph as background*, *Show me things I said I wanted to do, but don't make
-   them commitments*, *Reset to defaults*. Current policy is shown under the chat.
-4. **Spatial.** Drag *stayed up too late scrolling* next to *slept kind of badly
-   again*: the pair glows and **Connect these?** appears. Accepting appends
-   `blocks_connected` (spatial-only metadata; the document shows a small
-   *connected* chip and nothing else). Dropping a block indented just under another
-   offers **Group under?**, which appends `block_grouped`.
-5. **Round trip.** `block_grouped` re-nests the child under its parent in the
-   document projection (same object ids). Connections do not round-trip into text
-   because adjacency has no faithful textual meaning; they stay spatial-only.
-   **← write** flies every span back onto its paragraph position and reveals the
-   editor; edits re-run the loop and prior corrections still apply.
+1. **Brain dump → visible restructuring.** Spans highlight, lift, and fly into
+   *Sleep / Work / felt better after / Open*; connectives fade; markers and colour
+   settle; *Today* and generated headings fade in; then proposals.
+2. **Tending.** *want to do something different with my weekends* is inferred a
+   soft action (0.62) and gets *an action? yes / no*. **no** rejects
+   `…|type=action`: the block leaves *Open* and settles under the authored heading
+   *keep thinking* as a reflection; its next move disappears.
+3. **Steering.** `/` then *Don't turn casual thoughts into tasks.* → policy patch,
+   `automation_policy_changed`, *Open* becomes *Intentions*, no next moves.
+   *Stop suggesting next moves.* holds back one agent intention and changes only
+   the doer, never the reader (tested).
+4. **Pinning.** Drag a phrase right of the column: it is pinned on the plane
+   (`block_pinned`); dragging it back into the column returns it to flow. Drag a
+   second near it: the scanner emits `a|near=b`, the doer offers *connect these?*;
+   confirming it is the connection (a dashed line, a *connected* chip). Drop one
+   indented under another: *group under?*; confirming re-nests it in the flow.
+5. **Frames.** Arrows or arrow keys move to the adjacent frame on the plane. Each
+   frame has its own text, tends and pins; the log carries the frame id.
+6. **Raw.** Hold Space: the paragraph shows through the structure.
 
 ## How animated provenance is implemented
 
-`src/projection/transition.ts`, plus the `Replica` in `DocumentProjection.tsx`.
+`src/projection/transition.ts` and the `Replica` in `Frame.tsx`.
 
-1. While the editor is still visible, `App.structure()` asks the adapter for the
-   on-screen rect of every object's `displayRange` (and every authored label range)
-   via `wg.domAtPos` + `Range.getClientRects()`.
-2. The structured layout mounts in the **lift** phase (same React commit as the
-   stage change). A `Replica` of the paragraph is laid over the same column: the
-   spans that are about to move are invisible slots that keep their space; the
-   connectives are visible "glue". The editor is hidden underneath but kept
-   mounted. Because editor, replica and projection share one column, one font and
-   zero chrome, the swap is pixel-stable.
-3. `useFlip` (a small FLIP hook keyed by `data-flip` = object id) measures each
-   destination span, applies the inverse transform so it renders exactly on its
-   source rect (left edges and vertical centres aligned), and after 260 ms releases
-   it. Duration and easing come from confidence (`motionFor`): ≥0.8 moves in
-   520 ms decisively; <0.65 takes 820 ms with a softer curve and arrives marked
-   *tentative* with a clarification affordance.
-4. Phases drive CSS only: **lift** (highlight) → **move** (glue fades, spans fly)
-   → **settle** (markers, indentation, colour, italics, child size) → **label**
-   (title and generated headings) → **affordance** (buttons, questions, next
-   moves) → idle. Typography does not change until the piece has settled.
-5. Every later relayout (correction, policy change, spatial grouping) is the same
-   hook diffing the previous rects, so a block visibly travels from its old
-   section to its new one. Returning to the editor is the inverse: `flyTo` moves
-   spans onto rects measured from the (hidden) editor, glue fades back in, then
-   the editor is revealed.
+1. While the editor is visible, every object's `displayRange` (and every authored
+   label range) is measured through `wg.domAtPos` + `Range.getClientRects()`.
+2. The structured layout mounts in the **lift** phase in the same commit as the
+   stage change. A `Replica` of the paragraph lies over the same column: the spans
+   about to move are invisible slots keeping their space; the connectives are
+   visible glue. The editor is hidden underneath, still mounted.
+3. `useFlip` (FLIP keyed by `data-flip` = object id) measures each destination
+   span, applies the inverse transform so it renders on its source rect (left
+   edges and vertical centres aligned), and releases after 260 ms. Duration and
+   easing come from confidence (`motionFor`).
+4. Phases drive CSS: lift → move → settle → label → affordance → idle. Typography
+   does not change until a span has settled.
+5. Every later relayout (a tend, a policy change, a pin, a return to flow) is the
+   same hook diffing previous rects; a drop seeds the hook with the drop rect so
+   the block does not jump. Returning to the editor is the inverse (`flyTo`).
 
-No animation library. The animated element is the destination element, which is
-the standard FLIP compromise: the DOM node is re-parented by React, but the text is
-identical and it starts on the source's pixels, so the eye tracks one object.
+No animation library.
 
 ## Shortcuts taken
 
-* **Text snapshots in events.** Each `text_changed` event carries Wordgard's
-  change ranges *and* the full text afterwards; the reducer uses the snapshot. Honest
-  replay from deltas would need Wordgard position semantics in the reducer.
-* **Ids are content hashes.** An object's id is a hash of its normalised displayed
-  text (plus an occurrence index). Stable across corrections, policy changes and
-  spatial moves; a correction is lost if you rewrite the phrase it points at.
-  Split pieces are `id` and `id.2`; a merge keeps the first id.
-* **The interpreter is regexes.** Sentence and clause splitting on a fixed list of
-  connectives, leading-stub stripping, marker-based typing, five keyword topics.
-  Tuned to make the case study excellent; it will be wrong on other prose.
-* **Editing and structure are separate stages.** You cannot type into the
-  structured view; **← write** takes you back. Simultaneous rich editing with a
-  live animated projection is not solved here.
-* **Chat commands are pattern-matched**, and only the six seeded intents (plus a few
-  phrasings) work.
-* **Spatial mode is a few hundred lines**: absolute-positioned nodes, drag,
-  proximity test, two offers. No pan/zoom, no edges editor, not JSON Canvas.
+* **Text snapshots in events.** Each `text_changed` carries the full text after the
+  change. Honest replay from deltas would need Wordgard positions in the reducer.
+* **Ids are content hashes** of the displayed phrase. A tend is lost if the phrase
+  it points at is rewritten. Split pieces are `id` and `id.2`; a merge keeps the
+  first id.
+* **Producers are regexes**: connectives, stub stripping, marker-based typing,
+  five keyword topics, hand-written intents per marker, geometry with estimated
+  box heights. Tuned to make the case study excellent.
+* **Editing and structure are separate stages.** *write* returns to the paragraph;
+  the structured view is not editable in place.
+* **Commands are pattern-matched**; only the seven seeds (plus a few phrasings) work.
+* **Frames are a naked grid.** A frame is `"x,y"`; visiting creates it. What an
+  adjacent frame *means* (a day, a topic) is not decided.
+* **No marquee select and no group target.** Of the nine targets, selection and
+  group are not built.
 * **Persistence is localStorage**, capped at 3000 events.
 
 ## What should be replaced by CRDT / agent infrastructure later
 
-* `events/store.ts` and the snapshot-in-event shortcut → a CRDT (Wordgard ships a
-  `wordgard/collab` module) or an event-sourced doc with stable span anchors, so
-  `sourceRange` survives concurrent edits and ids stop being content hashes.
-* `interpretation/interpret.ts` → an LLM/agent that returns the **same contract**:
-  stable id, exact source substring + range, type, confidence, optional group,
-  optional actions, optional short label. Never replacement text. The projection
-  and animation need nothing else from it.
-* `automation/policies.ts` → an agent that maps utterances to policy patches; the
-  patch shape and the `automation_policy_changed` event are already the interface.
-* `system_inference` events → a real inference journal, if provenance of *why* an
-  interpretation was made is wanted long-term.
+* `events/store.ts` and snapshot events → a CRDT (`wordgard/collab` exists) or an
+  event-sourced doc with stable span anchors, so ids stop being content hashes.
+* `interpretation/interpret.ts` and `scanner.ts` → model producers that keep the
+  **same contract**: stable id, exact substring + range, claims with a key, a
+  confidence and a basis, never replacement text. The list, the reader and the
+  doer need nothing else.
+* `automation/policies.ts` → an agent that maps utterances to tends of its own
+  intentions; the `heldBack` set and the patch event are already the interface.
+* The proposal shapes (`toggle`, `soundboard`, `connect`, `nest`) → a registry of
+  widgets with declared semantics, so a widget's events can become claims.
 
 ## What this prototype proves or fails to prove
 
-**Proves (or at least demonstrates convincingly on one paragraph):**
+**Proves, on one paragraph:**
 
-* The loop *raw text → inferred structure → animated reorganisation → affordances →
-  correction/steering → re-interpretation* can be built on an append-only log with
-  three pure functions, and the log really is the only state that matters: reload
-  replays everything, corrections and policies persist, the inspector shows the
-  chain.
-* Animated provenance is achievable without an animation library, and it does the
-  explanatory work: because every block starts on its own pixels, the question
-  "where did this come from?" never arises. Aligning on vertical centres and keeping
-  the paragraph's typography until settle were the two details that made it read as
-  one object rather than a copy.
-* Corrections as *manipulating the interpretation* feel right: "not a task" moves
-  the block, changes its marker, removes its button, and opens a heading made from
-  the author's own words.
-* Chat as a control plane is cheap to make real when policy is explicit state that
-  the interpreter reads.
+* The loop *data → implications → intention → proposal → data* runs on an
+  append-only log with three pure functions, and a reader/doer split falls out of
+  it cleanly: holding back an agent intention changes proposals and nothing else.
+* One running list with keys and states is enough for durable tending: every
+  correction the first version had is now a tend of a claim, and legacy events
+  replay onto it.
+* Typographic structure and spatial placement coexist in one frame without a
+  mode switch. Dragging out of the column is the whole gesture.
+* Animated provenance survives the extra machinery.
 
 **Fails to prove:**
 
-* That the interpretation is any good. It is deterministic regexes tuned to one
-  paragraph; a second messy paragraph exposes it quickly (topic keywords are naive,
-  "I think" is treated as a hedge, questions never split). Whether an LLM can hold
-  the *exact-substring, no-paraphrase* contract reliably is untested.
-* That the animation scales. Ten spans is legible; forty flying spans across a
-  long entry would be noise. Grouping the motion (section by section) is untried.
-* That editing and structure can coexist. The stage switch is a real limitation:
-  the moment you want to tweak a word inside the structured view you are back in
-  the paragraph. A projection that stays editable in place is the hard problem and
-  is not attempted.
-* That users understand which words are theirs. Serif-vs-sans is the whole
-  signal; the *Possible next moves* buttons carry authored text inside generated
-  chrome and could be read as system speech.
-* That ids can be stable without a CRDT. Content-hash ids work until the author
-  edits the phrase, then the correction silently drops.
-* That "confidence" is meaningful. Here it is a hand-picked number per regex;
-  slower motion for lower confidence is a nice idea whose value cannot be judged
-  from fake numbers.
+* That the implications are any good. Regex producers give one hand-written
+  implication per rule; intent in particular is a guess per marker.
+* That the list stays legible as it grows. There is no per-frame budget and no
+  threshold beyond the toggle's 0.65; a real producer would flood the margin.
+* That editing and structure can coexist in place.
+* That generated language in small-caps serif reads as generated. The sans/serif
+  split was a stronger signal; this is a bet on restraint.
+* That content-hash ids survive real editing.
+* That a naked frame grid is the right space. Arrows work; what they lead to is
+  undecided.

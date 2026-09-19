@@ -1,6 +1,6 @@
 import type { EventKind, EventType, LogEvent } from "./types"
 
-const STORAGE_KEY = "malleable-paper.events.v1"
+const STORAGE_KEY = "malleable-paper.events.v2"
 const MAX_EVENTS = 3000
 
 type Listener = () => void
@@ -32,23 +32,23 @@ function emit() {
   for (const l of listeners) l()
 }
 
-export function appendEvent(
-  eventType: EventType,
-  kind: EventKind,
-  payload: Record<string, unknown>,
-  objectId?: string,
-): LogEvent {
+export interface AppendOptions {
+  objectId?: string
+  frame?: string
+}
+
+export function appendEvent(eventType: EventType, kind: EventKind, payload: Record<string, unknown>, opts: AppendOptions = {}): LogEvent {
   counter += 1
   const ev: LogEvent = {
     id: `ev-${counter.toString(36)}-${Date.now().toString(36)}`,
     ts: Date.now(),
     eventType,
     kind,
-    objectId,
+    frame: opts.frame,
+    objectId: opts.objectId,
     payload,
   }
-  // Append-only. We cap the array length for localStorage, dropping the oldest
-  // text snapshots only; the latest snapshot is always retained.
+  // Append-only. The array is capped for localStorage by dropping the oldest events.
   events = events.length >= MAX_EVENTS ? [...events.slice(events.length - MAX_EVENTS + 1), ev] : [...events, ev]
   persist()
   emit()

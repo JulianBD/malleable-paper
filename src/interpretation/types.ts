@@ -1,4 +1,5 @@
 import type { ObjType } from "../events/reducer"
+import type { Implication, Intent } from "./implications"
 
 export interface Range {
   from: number
@@ -17,15 +18,14 @@ export interface InterpretedObject {
   /** Full clause, exact substring of the source text. */
   sourceText: string
   sourceRange: Range
-  /** The part of the clause the projection shows. Always inside sourceRange. */
+  /** The part of the clause the presentation shows. Always inside sourceRange. */
   displayRange: Range
   displayText: string
   inferredType: ObjType
   confidence: number
-  /** Ranked alternatives, used when a type is rejected. */
-  candidates: Array<{ type: ObjType; score: number }>
-  explicitTypeOverride?: ObjType
-  rejectedTypes: ObjType[]
+  confirmedType: boolean
+  intent: Intent
+  intentConfidence: number
   groupId: string
   parentId?: string
   paragraphIndex: number
@@ -33,7 +33,6 @@ export interface InterpretedObject {
   status?: string
   unstructured: boolean
   suggestedActions: string[]
-  /** Why the interpreter chose this (for the inspector). */
   reason: string
 }
 
@@ -49,4 +48,6 @@ export interface Interpretation {
   groups: Group[]
   /** Ranges of source text that are not displayed by any object (connectives, stubs). */
   glue: Range[]
+  /** The running list: every implication the producers hold about this frame, with state. */
+  implications: Implication[]
 }
