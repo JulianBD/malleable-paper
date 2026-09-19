@@ -1,6 +1,7 @@
 import type { LogEvent, TextChangedPayload } from "./types"
 import { DEFAULT_POLICIES, applyPolicyPatch, type Policies, type PolicyPatch } from "../automation/policies"
 import { claimKey, nearKey, type Tends } from "../interpretation/implications"
+import { frameId, today } from "../frames"
 
 export type ObjType = "note" | "question" | "reflection" | "intention" | "action" | "reference"
 export const OBJ_TYPES: ObjType[] = ["note", "question", "reflection", "intention", "action", "reference"]
@@ -31,7 +32,7 @@ export interface SourceState {
   eventCount: number
 }
 
-export const DEFAULT_FRAME = "0,0"
+export const DEFAULT_FRAME = frameId({ day: today(), thread: "journal" })
 
 export function emptyFrame(id: string): FrameState {
   return { id, text: "", corrections: {}, tends: {}, statuses: {}, pinned: {}, nextMovesDismissedAt: -1, lastTextAt: -1 }

@@ -15,6 +15,7 @@ import { CommandLine } from "./chat/CommandLine"
 import { EventInspector } from "./dev/EventInspector"
 import { describePolicies, parseCommand } from "./automation/policies"
 import { splitParagraphs } from "./interpretation/segment"
+import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, type BasisId } from "./frames"
 
 export const DEMO_TEXT =
   "I slept kind of badly again and I think I stayed up too late scrolling. Work was fine but I kept avoiding the one thing I actually needed to finish. I felt better after walking to get coffee though. I should probably text Sam back because I've left that sitting for two days. I also keep thinking I want to do something different with my weekends instead of losing Saturday mornings."
@@ -150,14 +151,19 @@ export function App() {
     remount("")
   }, [remount])
 
-  const navigate = useCallback((dx: number, dy: number) => {
-    const [x, y] = frameRef.current.split(",").map(Number)
-    const next = `${x + dx},${y + dy}`
-    appendEvent("human_event", "frame_visited", { from: frameRef.current }, { frame: next })
+  const goTo = useCallback((next: string) => {
+    if (next === frameRef.current) return
+    appendEvent("human_event", "frame_visited", { from: frameRef.current, coordinate: parseFrameId(next) }, { frame: next })
     frameRef.current = next
     setFrameId(next)
     remount(frameOf(reduce(getEvents()), next).text)
   }, [remount])
+
+  /** Move one unit along one basis of the frame's coordinate. */
+  const navigate = useCallback((basis: BasisId, delta: 1 | -1) => {
+    const threads = threadsFrom(Object.keys(reduce(getEvents()).frames))
+    goTo(coordId(step(parseFrameId(frameRef.current), basis, delta, threads)))
+  }, [goTo])
 
   // ---- tending, corrections, affordances ---------------------------------
   const onTend = useCallback((key: string, state: TendState, reason: string) => {
@@ -237,10 +243,10 @@ export function App() {
       if (e.key === "/") { e.preventDefault(); setCmdFocus((n) => n + 1); return }
       if (stageRef.current !== "structured") return
       if (e.key === " ") { e.preventDefault(); setRaw(true); return }
-      if (e.key === "ArrowLeft") navigate(-1, 0)
-      else if (e.key === "ArrowRight") navigate(1, 0)
-      else if (e.key === "ArrowUp") navigate(0, -1)
-      else if (e.key === "ArrowDown") navigate(0, 1)
+      if (e.key === "ArrowLeft") navigate("day", -1)
+      else if (e.key === "ArrowRight") navigate("day", 1)
+      else if (e.key === "ArrowUp") navigate("thread", -1)
+      else if (e.key === "ArrowDown") navigate("thread", 1)
       const id = focusedRef.current
       if (!id) return
       const t = KEY_TYPES[e.key.toLowerCase()]
@@ -254,13 +260,15 @@ export function App() {
   }, [navigate, onTend, onCorrection])
 
   const onCommand = useCallback((text: string) => {
+    // goTo is stable; declared above
     const src = reduce(getEvents())
     const fr = frameOf(src, frameRef.current)
     const parsed = parseCommand(text, { currentParagraphs: splitParagraphs(fr.text).map((_, i) => i), policies: src.policies })
     if (!parsed) { setLastReply("no policy matches that · try a seed"); return }
+    if (parsed.thread) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), thread: parsed.thread })); return }
     appendEvent("policy_change", "automation_policy_changed", { patch: parsed.patch, utterance: text, before: describePolicies(src.policies) })
     setLastReply(parsed.reply)
-  }, [])
+  }, [goTo])
 
   useEffect(() => () => cancelTimeline.current(), [])
 
@@ -271,11 +279,13 @@ export function App() {
   }
 
   const stageLabel = stage === "editing" ? (listening ? "reading" : "writing") : phase === "idle" ? (raw ? "raw" : "structured") : phase
+  const coord = parseFrameId(frameId)
+  const dayLabel = relativeDay(coord.day) ?? formatDay(coord.day)
 
   return (
     <div className={`app stage-${stage}`}>
       <header className="topbar generated">
-        <span className="brand">malleable paper · {frameId} · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
+        <span className="brand">malleable paper · <span className="coord-day">{dayLabel}</span> · <span className="coord-thread">{coord.thread}</span> · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
         <span className="controls">
           <button className="ghost" onClick={loadDemo}>load demo</button>
           <button className="ghost" onClick={reset}>reset</button>
@@ -291,6 +301,7 @@ export function App() {
               presentation={presentation} interp={interp} proposals={proposals} frame={frame}
               phase={phase} raw={raw} flipSeed={flipSeed} rootRef={frameRoot}
               handlers={handlers} onNavigate={navigate} onWrite={write} onTend={onTend}
+              title={[{ basis: "day", label: dayLabel, detail: formatDay(coord.day) }, { basis: "thread", label: coord.thread, detail: "thread" }]}
             />
           )}
           {stage === "editing" && !frame.text.trim() && (
@@ -302,7 +313,7 @@ export function App() {
         <CommandLine policies={source.policies} lastReply={lastReply} onCommand={onCommand} focusSignal={cmdFocus} />
       </main>
 
-      <EventInspector events={events} interp={interp} presentation={presentation} proposals={proposals} frameId={frameId} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
+      <EventInspector events={events} interp={interp} presentation={presentation} proposals={proposals} frameId={`${dayLabel} · ${coord.thread}`} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
     </div>
   )
 }

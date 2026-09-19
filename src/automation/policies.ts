@@ -54,7 +54,9 @@ export function holds(p: Policies, id: AgentIntentionId): boolean {
 }
 
 export interface ParsedCommand {
-  patch: PolicyPatch
+  patch?: PolicyPatch
+  /** A navigation instead of a policy: go to this thread on the current day. */
+  thread?: string
   /** Short confirmation for the command line (generated language). */
   reply: string
 }
@@ -67,6 +69,7 @@ export const SEED_COMMANDS = [
   "Show me things I said I wanted to do, but don't make them commitments.",
   "Stop suggesting next moves.",
   "Reset to defaults.",
+  "thread sam",
 ]
 
 /** Deterministic command → policy mapping. A future agent would replace this. */
@@ -75,6 +78,8 @@ export function parseCommand(input: string, context: { currentParagraphs: number
   if (!t) return null
   const held = context.policies.journal.heldBack
 
+  const th = /^(?:thread|go to|open)\s+([a-z0-9][a-z0-9 -]{0,24})$/.exec(t)
+  if (th) return { thread: th[1].trim(), reply: `thread → ${th[1].trim()}` }
   if (/\breset\b|\bdefaults?\b|\bstart over\b/.test(t)) {
     return { patch: { reset: true }, reply: "policies reset to defaults" }
   }

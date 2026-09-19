@@ -20,12 +20,14 @@ interface Props {
   flipSeed: MutableRefObject<FlipSeed | null>
   rootRef: MutableRefObject<HTMLDivElement | null>
   handlers: BlockHandlers
-  onNavigate: (dx: number, dy: number) => void
+  onNavigate: (basis: "day" | "thread", delta: 1 | -1) => void
   onWrite: () => void
   onTend: BlockHandlers["onTend"]
+  /** The coordinate, one entry per basis, rendered as the frame's title. */
+  title: Array<{ basis: string; label: string; detail: string }>
 }
 
-export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend }: Props) {
+export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend, title }: Props) {
   useFlip(rootRef, flipSeed, [presentation])
   const showReplica = phase === "lift" || phase === "move" || phase === "return" || raw
   const soundboard = proposals.find((p) => p.shape === "soundboard")
@@ -33,10 +35,10 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
 
   return (
     <div ref={rootRef} className={`frame phase-${phase} ${raw ? "raw" : ""}`}>
-      <button className="arrow arrow-up generated" onClick={() => onNavigate(0, -1)} title="frame above">↑</button>
-      <button className="arrow arrow-left generated" onClick={() => onNavigate(-1, 0)} title="frame to the left">←</button>
-      <button className="arrow arrow-right generated" onClick={() => onNavigate(1, 0)} title="frame to the right">→</button>
-      <button className="arrow arrow-down generated" onClick={() => onNavigate(0, 1)} title="frame below">↓</button>
+      <button className="arrow arrow-up generated" onClick={() => onNavigate("thread", -1)} title="previous thread"><span>↑</span><em>thread</em></button>
+      <button className="arrow arrow-left generated" onClick={() => onNavigate("day", -1)} title="the day before"><span>←</span><em>day</em></button>
+      <button className="arrow arrow-right generated" onClick={() => onNavigate("day", 1)} title="the day after"><span>→</span><em>day</em></button>
+      <button className="arrow arrow-down generated" onClick={() => onNavigate("thread", 1)} title="next thread"><span>↓</span><em>thread</em></button>
 
       {showReplica && <Replica interp={interp} phase={phase} raw={raw} />}
 
@@ -46,7 +48,11 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
         onClick={(e) => { if (e.target === flowRef.current) onWrite() }}
       >
         <div className="title-row">
-          <h2 className="title generated">{presentation.title.text}</h2>
+          <h2 className="title generated tuple">
+            {title.map((t, i) => (
+              <span key={t.basis} className={`coord coord-${t.basis}`} title={t.detail}>{i > 0 && <span className="sep">·</span>}{t.label}</span>
+            ))}
+          </h2>
           <button className="ghost generated" onClick={onWrite}>write</button>
         </div>
         {presentation.sections.map((s) => <SectionView key={s.id} section={s} h={handlers} />)}

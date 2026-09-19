@@ -51,8 +51,12 @@ input { font: inherit; }
 .empty-hint { padding: 0 var(--col-pad); margin-top: -14px; }
 
 .frame { position: relative; min-height: 72vh; }
-.arrow { position: absolute; width: 28px; height: 28px; line-height: 28px; text-align: center; color: var(--blue-d); background: var(--blue-l); font-size: 14px; font-weight: 600; padding: 0; z-index: 3; transition: background 150ms, color 150ms; }
+.arrow { position: absolute; min-width: 28px; height: 28px; line-height: 28px; text-align: center; color: var(--blue-d); background: var(--blue-l); font-size: 14px; font-weight: 600; padding: 0 6px; z-index: 3; transition: background 150ms, color 150ms; display: flex; align-items: center; gap: 6px; }
+.arrow em { font-style: normal; font-size: 10px; letter-spacing: .1em; display: none; }
 .arrow:hover { background: var(--blue-d); color: #fff; }
+.arrow:hover em { display: inline; }
+.arrow-up, .arrow-down { color: var(--violet-d); background: var(--violet-l); }
+.arrow-up:hover, .arrow-down:hover { background: var(--violet-d); }
 .arrow-up { top: -8px; left: 50%; transform: translateX(-50%); }
 .arrow-down { bottom: -8px; left: 50%; transform: translateX(-50%); }
 .arrow-left { left: -8px; top: 50%; transform: translateY(-50%); }
@@ -82,6 +86,9 @@ input { font: inherit; }
 .flow { position: relative; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--blue-l); }
 .title { margin: 0; }
+.title.tuple { display: flex; gap: 8px; align-items: baseline; }
+.coord-thread { color: var(--violet-d); }
+.title .sep { color: var(--rule); margin-right: 8px; }
 .sec { margin: 0 0 28px; }
 .heading { margin: 0 0 6px; }
 .heading.generated { color: var(--blue-d); }

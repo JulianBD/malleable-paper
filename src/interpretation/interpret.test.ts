@@ -129,17 +129,17 @@ describe("steering tends the agent's intentions", () => {
   const ctx = { currentParagraphs: [0], policies: DEFAULT_POLICIES }
   test("'Don't turn casual thoughts into tasks.' → explicit-only, no Open section, no moves", () => {
     const cmd = parseCommand("Don't turn casual thoughts into tasks.", ctx)!
-    const p = applyPolicyPatch(DEFAULT_POLICIES, cmd.patch)
+    const p = applyPolicyPatch(DEFAULT_POLICIES, cmd.patch!)
     expect(sectionsOf(base, p).map(([l]) => l)).toEqual(["Sleep", "Work", "felt better after", "Intentions"])
     expect(moves(base, p)).toBeNull()
   })
   test("'Stop suggesting next moves.' holds back one agent intention", () => {
     const cmd = parseCommand("Stop suggesting next moves.", ctx)!
-    expect(applyPolicyPatch(DEFAULT_POLICIES, cmd.patch).journal.heldBack).toEqual(["surface-next-moves"])
+    expect(applyPolicyPatch(DEFAULT_POLICIES, cmd.patch!).journal.heldBack).toEqual(["surface-next-moves"])
   })
   test("'Be more subtle' leaves notes as prose", () => {
     const cmd = parseCommand("Be more subtle with journal entries.", ctx)!
-    const p = applyPolicyPatch(DEFAULT_POLICIES, cmd.patch)
+    const p = applyPolicyPatch(DEFAULT_POLICIES, cmd.patch!)
     expect(interpret(base, p).objects.filter((o) => o.unstructured).length).toBe(5)
   })
   test("unknown commands do not change policy", () => {
