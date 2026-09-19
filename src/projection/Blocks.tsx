@@ -38,7 +38,7 @@ export function BlockView({ block, depth, h }: { block: Block; depth: number; h:
       onPointerLeave={() => h.setFocusedId(null)}
     >
       <div className="line" onPointerDown={(e) => h.onLift(e, block.id)}>
-        {block.treatment === "bullet" && <span className="marker generated" title={`${block.type} · ${block.confidence.toFixed(2)} · ${block.reason}`}>{TYPE_MARK[block.type]}</span>}
+        {block.treatment === "bullet" && <span className={`marker mk-${block.type}`} title={`${block.type} · ${block.confidence.toFixed(2)} · ${block.reason}`} aria-label={TYPE_MARK[block.type]} />}
         <span className="authored" data-flip={block.id} data-confidence={block.confidence}>{block.text}</span>
         {block.status && <span className="tag generated">{block.status}</span>}
         {block.connections.length > 0 && <span className="tag generated">connected</span>}

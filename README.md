@@ -117,9 +117,14 @@ original correction kinds map onto tends of type, near and parent claims.
   serif. The tests assert it for every object and label.
 * **Derived presentation** — grouping, order, nesting, bullets, colour, italics,
   indentation, pinned placement.
-* **Generated language** — small caps in the same serif, muted: section labels
-  such as *Sleep*, the affordance verbs, the clarification *an action?*, command
-  replies. No summaries, no advice, no paraphrase.
+* **Generated language** — 12px semibold uppercase sans in a pastel's dark tone:
+  section labels such as *Sleep*, the affordance verbs, the clarification
+  *an action?*, command replies. No summaries, no advice, no paraphrase.
+
+Appearance: pure white ground, one sans family (Inter / system), a hierarchy of
+size and weight only, five pastel pairs (light for fills, dark for text and
+strokes), geometric type markers (disc, square, ring, diamond, triangle), 2px
+rules, no shadows, no gradients, no greys.
 
 ## Demo flows
 
@@ -218,8 +223,9 @@ No animation library.
 * That the list stays legible as it grows. There is no per-frame budget and no
   threshold beyond the toggle's 0.65; a real producer would flood the margin.
 * That editing and structure can coexist in place.
-* That generated language in small-caps serif reads as generated. The sans/serif
-  split was a stronger signal; this is a bet on restraint.
+* That generated language reads as generated when the whole page is one sans
+  family. Size, weight, case and colour carry the distinction now; the serif/sans
+  split was a stronger signal.
 * That content-hash ids survive real editing.
 * That a naked frame grid is the right space. Arrows work; what they lead to is
   undecided.

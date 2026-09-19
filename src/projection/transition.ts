@@ -69,6 +69,7 @@ export function useFlip(container: RefObject<HTMLElement | null>, seedRef: Mutab
       const id = el.dataset.flip!
       el.style.transition = "none"
       el.style.transform = ""
+      el.classList.remove("flip-moving")
       const now = pageRect(el)
       next.set(id, now)
       const before = prev.get(id)
