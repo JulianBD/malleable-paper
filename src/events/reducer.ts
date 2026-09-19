@@ -1,7 +1,7 @@
 import type { LogEvent, TextChangedPayload } from "./types"
 import { DEFAULT_POLICIES, applyPolicyPatch, type Policies, type PolicyPatch } from "../automation/policies"
 import { claimKey, nearKey, type Tends } from "../interpretation/implications"
-import { frameId, today } from "../frames"
+import { frameId, today, isBound, parseFrameId } from "../frames"
 
 export type ObjType = "note" | "question" | "reflection" | "intention" | "action" | "reference"
 export const OBJ_TYPES: ObjType[] = ["note", "question", "reflection", "intention", "action", "reference"]
@@ -78,7 +78,7 @@ function step(s: SourceState, ev: LogEvent, index: number): SourceState {
       return withFrame(s, frame, (fr) => ({ ...fr, text: tp.text, lastTextAt: index }))
     }
     case "frame_visited":
-      return frame.includes("*") || frame.includes("|where=") ? s : withFrame(s, frame, (fr) => fr)
+      return isBound(parseFrameId(frame)) ? withFrame(s, frame, (fr) => fr) : s
 
     case "implication_confirmed":
       return withFrame(s, frame, (fr) => tend(fr, p.key, "confirmed", ev.ts))

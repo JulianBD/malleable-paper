@@ -2,7 +2,7 @@
 // with margin arrows to the four adjacent frames. Typographic structure and
 // spatial placement live together; a drag out of the flow pins an object.
 
-import { Fragment, useRef, type MutableRefObject } from "react"
+import { Fragment, useEffect, useRef, useState, type MutableRefObject } from "react"
 import type { FrameState } from "../events/reducer"
 import type { Interpretation, Label, Range } from "../interpretation/types"
 import { BlockView, WidgetBlock, type BlockHandlers } from "./Blocks"
@@ -25,11 +25,14 @@ interface Props {
   onTend: BlockHandlers["onTend"]
   /** The coordinate, one entry per basis, rendered as the frame's title. */
   title: Array<{ basis: string; label: string; detail: string }>
+  /** The query as canonical text; the title edits it. */
+  query: string
+  onQuery: (text: string) => void
   /** A page cut in the past is immutable: no write, no proposals acted on. */
   frozen?: boolean
 }
 
-export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend, title, frozen }: Props) {
+export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, rootRef, handlers, onNavigate, onWrite, onTend, title, query, onQuery, frozen }: Props) {
   useFlip(rootRef, flipSeed, [presentation])
   const showReplica = phase === "lift" || phase === "move" || phase === "return" || raw
   const soundboard = proposals.find((p) => p.shape === "soundboard")
@@ -50,11 +53,7 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
         onClick={(e) => { if (e.target === flowRef.current) onWrite() }}
       >
         <div className="title-row">
-          <h2 className="title generated tuple">
-            {title.map((t, i) => (
-              <span key={t.basis} className={`coord coord-${t.basis}`} title={t.detail}>{i > 0 && <span className="sep">·</span>}{t.label}</span>
-            ))}
-          </h2>
+          <Tuple title={title} query={query} onQuery={onQuery} />
           {frozen ? <span className="generated frozen-tag">page · immutable</span> : <button className="ghost generated" onClick={onWrite}>write</button>}
         </div>
         {presentation.sections.map((s) => <SectionView key={s.id} section={s} h={handlers} />)}
@@ -112,10 +111,39 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
   )
 }
 
-/** Title tuple shared by Frame and Digest. */
-export function Tuple({ title }: { title: Array<{ basis: string; label: string; detail: string }> }) {
+/**
+ * Title tuple shared by Frame and Digest. Click it and the tuple becomes the
+ * query as text: `day=2026-09* thread=work* type=action`. Enter applies it;
+ * Escape puts the tuple back. The arrows apply one generator each; the text
+ * applies any number at once.
+ */
+export function Tuple({ title, query, onQuery }: { title: Array<{ basis: string; label: string; detail: string }>; query: string; onQuery: (text: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(query)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (!editing) setText(query) }, [query, editing])
+  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select() } }, [editing])
+  if (editing) {
+    return (
+      <h2 className="title generated tuple editing">
+        <span className="query-mark">?</span>
+        <input
+          ref={inputRef}
+          className="title-input"
+          value={text}
+          spellCheck={false}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); setEditing(false); onQuery(text) }
+            if (e.key === "Escape") { e.preventDefault(); setEditing(false); setText(query) }
+          }}
+          onBlur={() => setEditing(false)}
+        />
+      </h2>
+    )
+  }
   return (
-    <h2 className="title generated tuple">
+    <h2 className="title generated tuple" title={`${query} · click to edit the query as text`} onClick={() => setEditing(true)}>
       {title.map((t, i) => (
         <span key={t.basis} className={`coord coord-${t.basis}`} title={t.detail}>{i > 0 && <span className="sep">·</span>}{t.label}</span>
       ))}

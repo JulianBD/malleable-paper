@@ -18,13 +18,15 @@ export interface DigestFrame {
 interface Props {
   frames: DigestFrame[]
   title: Array<{ basis: string; label: string; detail: string }>
+  query: string
+  onQuery: (text: string) => void
   rootRef: MutableRefObject<HTMLDivElement | null>
   flipSeed: MutableRefObject<FlipSeed | null>
   onNavigate: (basis: "day" | "thread", delta: 1 | -1) => void
   frozen: boolean
 }
 
-export function Digest({ frames, title, rootRef, flipSeed, onNavigate, frozen }: Props) {
+export function Digest({ frames, title, query, onQuery, rootRef, flipSeed, onNavigate, frozen }: Props) {
   useFlip(rootRef, flipSeed, [frames])
   return (
     <div ref={rootRef} className={`frame phase-idle digest ${frozen ? "frozen" : ""}`}>
@@ -34,7 +36,7 @@ export function Digest({ frames, title, rootRef, flipSeed, onNavigate, frozen }:
       <button className="arrow arrow-down generated" onClick={() => onNavigate("thread", 1)} title="next thread"><span>↓</span><em>thread</em></button>
       <div className="flow column">
         <div className="title-row">
-          <Tuple title={title} />
+          <Tuple title={title} query={query} onQuery={onQuery} />
           <span className="generated frozen-tag">{frozen ? "page · immutable" : "digest · read only"}</span>
         </div>
         {frames.length === 0 && <p className="generated quiet">nothing written in this query yet</p>}

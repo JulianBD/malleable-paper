@@ -1,6 +1,6 @@
 import type { EventKind, EventType, LogEvent } from "./types"
 
-const STORAGE_KEY = "malleable-paper.events.v3"
+const STORAGE_KEY = "malleable-paper.events.v4"
 const MAX_EVENTS = 3000
 
 type Listener = () => void

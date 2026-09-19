@@ -6,7 +6,7 @@
 
 import type { FrameState, Widget } from "./events/reducer"
 import type { Interpretation, InterpretedObject } from "./interpretation/types"
-import { parseFrameId, parseWhere, normTag, type Pattern } from "./frames"
+import { parseFrameId, parseWhere, normTag, matchValue, type Pattern } from "./frames"
 
 export interface Triple { s: string; p: string; o: string }
 
@@ -41,7 +41,7 @@ export function triplesOfWidget(w: Widget, frame: FrameState): Triple[] {
 function satisfies(triples: Triple[], text: string, pats: Pattern[]): boolean {
   return pats.every((pat) => {
     if (pat.key === "text") return text.toLowerCase().includes(pat.value)
-    return triples.some((t) => t.p === pat.key && normTag(t.o) === normTag(pat.value))
+    return triples.some((t) => t.p === pat.key && matchValue(pat.value, normTag(t.o)))
   })
 }
 

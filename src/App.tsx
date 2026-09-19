@@ -17,7 +17,7 @@ import { CommandLine } from "./chat/CommandLine"
 import { EventInspector } from "./dev/EventInspector"
 import { describePolicies, parseCommand } from "./automation/policies"
 import { splitParagraphs } from "./interpretation/segment"
-import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, isBound, matches, orderFrames, resultHash, today, UNBOUND, type BasisId } from "./frames"
+import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, formatThread, relativeDay, isBound, isExact, matches, orderFrames, resultHash, today, conjoin, parseQuery, queryText, type BasisId } from "./frames"
 import { selectIds, triplesOf, triplesOfWidget } from "./query"
 import { filterPresentation } from "./projection/present"
 
@@ -326,6 +326,8 @@ export function App() {
     if (parsed.thread) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), thread: parsed.thread })); return }
     if (parsed.day) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), day: parsed.day === "today" ? today() : parsed.day })); return }
     if (parsed.where !== undefined) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), where: parsed.where || undefined })); return }
+    if (parsed.and) { setLastReply(parsed.reply); goTo(coordId(conjoin(parseFrameId(frameRef.current), parsed.and))); return }
+    if (parsed.query) { setLastReply(parsed.reply); goTo(queryText(parseQuery(parsed.query))); return }
     if (parsed.widget) {
       if (!isBound(parseFrameId(frameRef.current))) { setLastReply("widgets are created in a bound frame"); return }
       const wid = `w-${hashIds([parsed.widget.kind, ...parsed.widget.tags, String(getEvents().length)])}`
@@ -337,6 +339,14 @@ export function App() {
     if (!parsed.patch) return
     appendEvent("policy_change", "automation_policy_changed", { patch: parsed.patch, utterance: text, before: describePolicies(src.policies) })
     setLastReply(parsed.reply)
+  }, [goTo])
+
+  /** The title is the query as text; editing it is the same move as applying a generator. */
+  const onQuery = useCallback((text: string) => {
+    const next = queryText(parseQuery(text))
+    if (!next) { setLastReply("a query needs at least one key=value"); return }
+    setLastReply(`query → ${next}`)
+    goTo(next)
   }, [goTo])
 
   useEffect(() => () => cancelTimeline.current(), [])
@@ -368,7 +378,7 @@ export function App() {
       const fr = source.frames[id]
       const it = interpret(fr, source.policies)
       const c = parseFrameId(id)
-      const parts = [coord.day === UNBOUND ? (relativeDay(c.day) ?? formatDay(c.day)) : null, coord.thread === UNBOUND ? c.thread : null].filter(Boolean)
+      const parts = [!isExact(coord.day) ? (relativeDay(c.day) ?? formatDay(c.day)) : null, !isExact(coord.thread) ? c.thread : null].filter(Boolean)
       const keep = new Set(selectIds(coord.where, it, fr))
       if (keep.size === 0) return []
       const pres = coord.where ? filterPresentation(present(it, fr), keep) : present(it, fr)
@@ -397,11 +407,12 @@ export function App() {
 
   const stageLabel = frozen ? "page" : !bound ? "digest" : stage === "editing" ? (listening ? "reading" : "writing") : phase === "idle" ? (raw ? "raw" : "structured") : phase
   const dayLabel = relativeDay(coord.day) ?? formatDay(coord.day)
-  const threadLabel = coord.thread === UNBOUND ? "every thread" : coord.thread
+  const threadLabel = formatThread(coord.thread)
+  const queryString = frameId
   const timeLabel = cut == null ? "now" : `${events.length - cut} events ago`
   const title = [
-    { basis: "day", label: dayLabel, detail: formatDay(coord.day) },
-    { basis: "thread", label: threadLabel, detail: "thread" },
+    { basis: "day", label: dayLabel, detail: `day=${coord.day}` },
+    { basis: "thread", label: threadLabel, detail: `thread=${coord.thread}` },
     ...(coord.where ? [{ basis: "where", label: coord.where, detail: "content key filter" }] : []),
     { basis: "time", label: timeLabel, detail: cut == null ? "the log as it is now" : `the log cut at event ${cut} of ${events.length}` },
   ]
@@ -428,11 +439,11 @@ export function App() {
               presentation={presentation} interp={interp} proposals={proposals} frame={frame}
               phase={phase} raw={raw} flipSeed={flipSeed} rootRef={frameRoot}
               handlers={handlers} onNavigate={navigate} onWrite={write} onTend={onTend}
-              title={title} frozen={frozen}
+              title={title} query={queryString} onQuery={onQuery} frozen={frozen}
             />
           )}
           {!bound && (
-            <Digest frames={digest} title={title} rootRef={frameRoot} flipSeed={flipSeed} onNavigate={navigate} frozen={frozen} />
+            <Digest frames={digest} title={title} query={queryString} onQuery={onQuery} rootRef={frameRoot} flipSeed={flipSeed} onNavigate={navigate} frozen={frozen} />
           )}
           {editable && stage === "editing" && !frame.text.trim() && (
             <div className="empty-hint generated">

@@ -150,7 +150,7 @@ describe("steering tends the agent's intentions", () => {
 describe("content by query: triples, conjunctions, widgets", () => {
   const { selectIds, triplesOf } = require("../query") as typeof import("../query")
   test("an authored object carries its coordinate and its live claims as triples", () => {
-    const fr: FrameState = { ...emptyFrame("day=2026-09-19|thread=journal"), text: DEMO }
+    const fr: FrameState = { ...emptyFrame("day=2026-09-19 thread=journal"), text: DEMO }
     const it = interpret(fr, DEFAULT_POLICIES)
     const sam = it.objects.find((o) => o.displayText === "text Sam back")!
     const ts = triplesOf(sam, it, fr).map((t) => `${t.p}=${t.o}`)
@@ -161,14 +161,14 @@ describe("content by query: triples, conjunctions, widgets", () => {
     expect(ts).toContain("mention=sam")
   })
   test("a where clause is a conjunction", () => {
-    const fr: FrameState = { ...emptyFrame("day=2026-09-19|thread=journal"), text: DEMO }
+    const fr: FrameState = { ...emptyFrame("day=2026-09-19 thread=journal"), text: DEMO }
     const it = interpret(fr, DEFAULT_POLICIES)
     expect(selectIds("type=action", it, fr)).toHaveLength(2)
     expect(selectIds("type=action mention=sam", it, fr)).toHaveLength(1)
     expect(selectIds("type=action mention=nobody", it, fr)).toHaveLength(0)
   })
   test("a widget created with tags is in the return set of a tag query", () => {
-    const fr: FrameState = { ...emptyFrame("day=2026-09-18|thread=work"), text: "", widgets: { "w-1": { id: "w-1", kind: "spreadsheet", tags: ["projects", "student debt"] } } }
+    const fr: FrameState = { ...emptyFrame("day=2026-09-18 thread=work"), text: "", widgets: { "w-1": { id: "w-1", kind: "spreadsheet", tags: ["projects", "student debt"] } } }
     const it = interpret(fr, DEFAULT_POLICIES)
     expect(selectIds("about=student-debt", it, fr)).toEqual(["w-1"])
     expect(selectIds("kind=spreadsheet about=projects", it, fr)).toEqual(["w-1"])

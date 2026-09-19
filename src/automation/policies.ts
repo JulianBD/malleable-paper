@@ -65,6 +65,10 @@ export interface ParsedCommand {
   where?: string
   /** Create a widget in the current frame: kind plus tags. */
   widget?: { kind: string; tags: string[] }
+  /** Replace the whole query with this text: "day=2026-09* thread=work* type=action". */
+  query?: string
+  /** Conjoin one more pattern onto the query (the where generator; never widens). */
+  and?: string
   /** Short confirmation for the command line (generated language). */
   reply: string
 }
@@ -83,6 +87,9 @@ export const SEED_COMMANDS = [
   "where type=action mention=sam",
   "widget spreadsheet projects student-debt",
   "where about=student-debt",
+  "and mention=sam",
+  "q day=2026-09* thread=work* type=action",
+  "thread work/project",
   "where off",
   "snapshot",
 ]
@@ -98,11 +105,16 @@ export function parseCommand(input: string, context: { currentParagraphs: number
   if (/^(?:day)\s+today$/.test(t)) return { day: "today", reply: "day → today" }
   const wg = /^widget\s+([a-z][a-z0-9-]*)((?:\s+[a-z0-9][a-z0-9-]*)*)$/.exec(t)
   if (wg) { const tags = wg[2].trim().split(/\s+/).filter(Boolean); return { widget: { kind: wg[1], tags }, reply: `widget ${wg[1]} · ${tags.join(" · ")}` } }
-  const wh = /^where\s+((?:[a-z]+=[a-z0-9-]+)(?:\s+[a-z]+=[a-z0-9-]+)*)$/.exec(t)
+  const PAT = "[a-z]+=[a-z0-9*/+-]+"
+  const wh = new RegExp(`^where\\s+((?:${PAT})(?:\\s+${PAT})*)$`).exec(t)
   if (wh) return { where: wh[1].trim(), reply: `where → ${wh[1].trim()}` }
+  const an = new RegExp(`^(?:and|narrow|∧)\\s+((?:${PAT})(?:\\s+${PAT})*)$`).exec(t)
+  if (an) return { and: an[1].trim(), reply: `∧ ${an[1].trim()}` }
+  const qq = new RegExp(`^(?:q|query|go)\\s+((?:${PAT})(?:\\s+${PAT})*)$`).exec(t) ?? new RegExp(`^((?:${PAT})(?:\\s+${PAT})+)$`).exec(t)
+  if (qq) return { query: qq[1].trim(), reply: `query → ${qq[1].trim()}` }
   if (/^where\s+(off|none|clear|\*)$/.test(t)) return { where: "", reply: "where → cleared" }
   if (/^(?:thread|threads)\s+(\*|all|every)$/.test(t)) return { thread: "*", reply: "thread → every thread" }
-  const th = /^(?:thread|go to|open)\s+([a-z0-9][a-z0-9 -]{0,24})$/.exec(t)
+  const th = /^(?:thread|go to|open)\s+([a-z0-9][a-z0-9 /*-]{0,40})$/.exec(t)
   if (th) return { thread: th[1].trim(), reply: `thread → ${th[1].trim()}` }
   if (/\breset\b|\bdefaults?\b|\bstart over\b/.test(t)) {
     return { patch: { reset: true }, reply: "policies reset to defaults" }

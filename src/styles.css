@@ -90,6 +90,11 @@ input { font: inherit; }
 .title .coord { white-space: nowrap; }
 .coord-thread { color: var(--violet-d); }
 .title .sep { color: var(--rule); margin-right: 8px; }
+.title.tuple:not(.editing) { cursor: text; }
+.title.tuple:not(.editing):hover .coord { text-decoration: underline; text-decoration-color: var(--teal-l); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.title.tuple.editing { flex: 1; gap: 8px; }
+.query-mark { color: var(--rose-d); font-weight: 700; }
+.title-input { flex: 1; min-width: 0; border: 0; border-bottom: 2px solid var(--rose-d); background: var(--rose-l); color: var(--ink); font: 500 13px/1.6 var(--mono); letter-spacing: 0; text-transform: none; padding: 2px 6px; outline: none; }
 .sec { margin: 0 0 28px; }
 .heading { margin: 0 0 6px; }
 .heading.generated { color: var(--blue-d); }
