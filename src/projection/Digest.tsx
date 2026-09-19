@@ -3,7 +3,7 @@
 // coordinate. It is read-only: writing happens in a bound frame.
 
 import type { MutableRefObject } from "react"
-import type { BlockHandlers } from "./Blocks"
+import { WidgetBlock, type BlockHandlers } from "./Blocks"
 import { SectionView, Tuple } from "./Frame"
 import type { Presentation } from "./present"
 import { useFlip, type FlipSeed } from "./transition"
@@ -42,6 +42,7 @@ export function Digest({ frames, title, rootRef, flipSeed, onNavigate, frozen }:
           <div key={f.id} className="member" data-member={f.id}>
             <h3 className="heading member-label generated">{f.label}</h3>
             {f.presentation.sections.map((s) => <SectionView key={s.id} section={s} h={f.handlers} />)}
+            {f.presentation.widgets.map((w) => <WidgetBlock key={w.id} id={w.id} kind={w.kind} tags={w.tags} keys={f.handlers.keysFor(w.id)} />)}
           </div>
         ))}
       </div>

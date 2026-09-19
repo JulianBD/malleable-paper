@@ -3,7 +3,7 @@ import { interpret } from "./interpret"
 import { present } from "../projection/present"
 import { propose } from "../projection/propose"
 import { claimKey, nearKey, type Tends } from "./implications"
-import { emptyFrame, reduce, type FrameState } from "../events/reducer"
+import { emptyFrame, reduce, type FrameState, DEFAULT_FRAME } from "../events/reducer"
 import { DEFAULT_POLICIES, applyPolicyPatch, parseCommand, type Policies } from "../automation/policies"
 import type { LogEvent } from "../events/types"
 
@@ -81,7 +81,7 @@ describe("tending is durable and changes reader and doer", () => {
       { id: "1", ts: 1, eventType: "human_event", kind: "text_changed", payload: { text: DEMO, changes: [], source: "demo" } },
       { id: "2", ts: 2, eventType: "user_correction", kind: "user_rejected_type", objectId: want.id, payload: { type: "action" } },
     ]
-    const fr = reduce(events).frames["0,0"]
+    const fr = reduce(events).frames[DEFAULT_FRAME]
     expect(fr.tends[claimKey(want.id, { kind: "type", type: "action" })].state).toBe("rejected")
   })
   test("combine with previous merges ranges and keeps the first id", () => {
@@ -144,5 +144,34 @@ describe("steering tends the agent's intentions", () => {
   })
   test("unknown commands do not change policy", () => {
     expect(parseCommand("make it purple", ctx)).toBeNull()
+  })
+})
+
+describe("content by query: triples, conjunctions, widgets", () => {
+  const { selectIds, triplesOf } = require("../query") as typeof import("../query")
+  test("an authored object carries its coordinate and its live claims as triples", () => {
+    const fr: FrameState = { ...emptyFrame("day=2026-09-19|thread=journal"), text: DEMO }
+    const it = interpret(fr, DEFAULT_POLICIES)
+    const sam = it.objects.find((o) => o.displayText === "text Sam back")!
+    const ts = triplesOf(sam, it, fr).map((t) => `${t.p}=${t.o}`)
+    expect(ts).toContain("day=2026-09-19")
+    expect(ts).toContain("thread=journal")
+    expect(ts).toContain("type=action")
+    expect(ts).toContain("intent=resolve")
+    expect(ts).toContain("mention=sam")
+  })
+  test("a where clause is a conjunction", () => {
+    const fr: FrameState = { ...emptyFrame("day=2026-09-19|thread=journal"), text: DEMO }
+    const it = interpret(fr, DEFAULT_POLICIES)
+    expect(selectIds("type=action", it, fr)).toHaveLength(2)
+    expect(selectIds("type=action mention=sam", it, fr)).toHaveLength(1)
+    expect(selectIds("type=action mention=nobody", it, fr)).toHaveLength(0)
+  })
+  test("a widget created with tags is in the return set of a tag query", () => {
+    const fr: FrameState = { ...emptyFrame("day=2026-09-18|thread=work"), text: "", widgets: { "w-1": { id: "w-1", kind: "spreadsheet", tags: ["projects", "student debt"] } } }
+    const it = interpret(fr, DEFAULT_POLICIES)
+    expect(selectIds("about=student-debt", it, fr)).toEqual(["w-1"])
+    expect(selectIds("kind=spreadsheet about=projects", it, fr)).toEqual(["w-1"])
+    expect(selectIds("about=taxes", it, fr)).toEqual([])
   })
 })

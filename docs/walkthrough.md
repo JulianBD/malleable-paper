@@ -108,6 +108,65 @@ Each frame has its own text, tends and pins.
 
 ![frame right](screens/18-frame-right.png)
 
+## 9. A frame is a coordinate
+
+The title is a tuple along two bases, day and thread. Arrow keys step one
+basis: left and right move a day, up and down move a thread. `/thread sam`
+opens a thread; a frame nobody has written in is empty, not missing.
+
+![coordinate title](screens/20-coordinate-title.png)
+
+![thread sam](screens/22-thread-sam.png)
+
+## 10. A frame is a query; a page is a snapshot
+
+An unbound component (`/thread *`, `/day *`) makes a digest: read-only, every
+member rendered with its own handlers. Shift+Arrow moves a cut through the
+log. A page is the query plus the cut, immutable. `/snapshot` records the page
+as a `page_rendered` event with the result hash.
+
+![digest](screens/24-digest-every-thread.png)
+
+![page as of](screens/25-page-as-of.png)
+
+## 11. Content by query
+
+`/where type=action` selects across every day and thread. The frame's identity
+is the hash of the ids in the result set; the top bar shows the hash and the
+diff against the previous result. Scrubbing time on the same query shrinks the
+set and changes the hash.
+
+![where actions](screens/28-where-actions.png)
+
+![where sam earlier](screens/30-where-sam-earlier.png)
+
+## 12. Objects are return sets
+
+Every object carries keys: triples of the form `object key=value`. Text
+objects get day, thread, type, group, intent and one `mention=` per
+capitalised word. Widgets get day, thread, kind and one `about=` per tag.
+
+`/widget spreadsheet projects student-debt` creates a widget in the work
+thread today.
+
+![widget created](screens/31-widget-created.png)
+
+A day later, in the journal thread, the widget is not there by place. It is
+there by query: `/where about=student-debt` across every day and thread
+returns it.
+
+![retrieved by query](screens/32-retrieved-by-query.png)
+
+Patterns conjoin. `/where type=action mention=sam` returns the two actions
+that mention Sam and nothing else.
+
+![conjunction](screens/33-conjunction.png)
+
+The tend menu shows the keys under the implications, so the question
+"which queries return this?" has an answer on the block itself.
+
+![keys](screens/34-keys.png)
+
 ## Design notes for the next round
 
 * Authored vs generated now rests on size, weight, case and colour alone.

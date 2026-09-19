@@ -5,7 +5,7 @@
 import { Fragment, useRef, type MutableRefObject } from "react"
 import type { FrameState } from "../events/reducer"
 import type { Interpretation, Label, Range } from "../interpretation/types"
-import { BlockView, type BlockHandlers } from "./Blocks"
+import { BlockView, WidgetBlock, type BlockHandlers } from "./Blocks"
 import type { Presentation, Section } from "./present"
 import type { Proposal } from "./propose"
 import { useFlip, type FlipSeed, type Phase } from "./transition"
@@ -58,6 +58,12 @@ export function Frame({ presentation, interp, proposals, phase, raw, flipSeed, r
           {frozen ? <span className="generated frozen-tag">page · immutable</span> : <button className="ghost generated" onClick={onWrite}>write</button>}
         </div>
         {presentation.sections.map((s) => <SectionView key={s.id} section={s} h={handlers} />)}
+        {presentation.widgets.length > 0 && (
+          <section className="sec sec-widgets">
+            <h3 className="heading generated">widgets</h3>
+            {presentation.widgets.map((w) => <WidgetBlock key={w.id} id={w.id} kind={w.kind} tags={w.tags} keys={handlers.keysFor(w.id)} />)}
+          </section>
+        )}
         {soundboard && soundboard.shape === "soundboard" && (
           <div className="next-moves">
             <h3 className="heading generated">possible next moves</h3>

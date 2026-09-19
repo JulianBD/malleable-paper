@@ -1,31 +1,67 @@
-// Content is in a frame by query. Every authored object carries keys: the
-// coordinate it was written in, and every claim the reader holds about it.
-// A `where` clause selects objects by one key; the frame renders the result.
+// Content is in a frame by query. Every object carries keys as triples
+// (object, key, value): the coordinate it was written in, and every claim the
+// reader holds about it. A widget carries the keys it was created with. A
+// where clause is a conjunction of patterns (?x key value); the frame renders
+// the return set.
 
-import type { FrameState } from "./events/reducer"
+import type { FrameState, Widget } from "./events/reducer"
 import type { Interpretation, InterpretedObject } from "./interpretation/types"
-import { parseWhere } from "./frames"
+import { parseFrameId, parseWhere, normTag, type Pattern } from "./frames"
+
+export interface Triple { s: string; p: string; o: string }
+
+/** Every triple an authored object carries, given its frame's reading. */
+export function triplesOf(o: InterpretedObject, interp: Interpretation, frame: FrameState): Triple[] {
+  const c = parseFrameId(frame.id)
+  const out: Triple[] = [
+    { s: o.id, p: "day", o: c.day },
+    { s: o.id, p: "thread", o: c.thread },
+  ]
+  for (const i of interp.implications) {
+    if (i.subject === o.id && (i.state === "proposed" || i.state === "confirmed")) {
+      const [p, v] = i.key.split("|")[1].split("=")
+      out.push({ s: o.id, p, o: v })
+    }
+  }
+  if (frame.statuses[o.id]) out.push({ s: o.id, p: "status", o: frame.statuses[o.id] })
+  for (const m of o.sourceText.match(/\b[A-Z][a-z]+\b/g) ?? []) if (!/^(I|Work|Why|Sam|Slept|Sent|Standup|The)$/.test(m) || m === "Sam") out.push({ s: o.id, p: "mention", o: m.toLowerCase() })
+  return out
+}
+
+export function triplesOfWidget(w: Widget, frame: FrameState): Triple[] {
+  const c = parseFrameId(frame.id)
+  return [
+    { s: w.id, p: "day", o: c.day },
+    { s: w.id, p: "thread", o: c.thread },
+    { s: w.id, p: "kind", o: normTag(w.kind) },
+    ...w.tags.map((t) => ({ s: w.id, p: "about", o: normTag(t) })),
+  ]
+}
+
+function satisfies(triples: Triple[], text: string, pats: Pattern[]): boolean {
+  return pats.every((pat) => {
+    if (pat.key === "text") return text.toLowerCase().includes(pat.value)
+    return triples.some((t) => t.p === pat.key && normTag(t.o) === normTag(pat.value))
+  })
+}
 
 /** Does this object satisfy the where clause, given its frame's reading? */
 export function objectMatches(where: string | undefined, o: InterpretedObject, interp: Interpretation, frame: FrameState): boolean {
-  const w = parseWhere(where)
-  if (!w) return true
-  switch (w.key) {
-    case "mention":
-      return new RegExp(`\\b${w.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(o.sourceText)
-    case "status":
-      return (frame.statuses[o.id] ?? "") === w.value
-    case "text":
-      return o.sourceText.toLowerCase().includes(w.value)
-    default: {
-      // type=, group=, intent=, parent=, near=: a live claim on this object.
-      const claim = `${w.key}=${w.value}`
-      return interp.implications.some((i) => i.subject === o.id && i.key.endsWith(`|${claim}`) && (i.state === "proposed" || i.state === "confirmed"))
-    }
-  }
+  const pats = parseWhere(where)
+  if (!pats.length) return true
+  return satisfies(triplesOf(o, interp, frame), o.sourceText, pats)
 }
 
-/** The ids a where clause selects from one frame's reading. */
+export function widgetMatches(where: string | undefined, w: Widget, frame: FrameState): boolean {
+  const pats = parseWhere(where)
+  if (!pats.length) return true
+  return satisfies(triplesOfWidget(w, frame), `${w.kind} ${w.tags.join(" ")}`, pats)
+}
+
+/** The ids a where clause selects from one frame's reading: authored objects and widgets. */
 export function selectIds(where: string | undefined, interp: Interpretation, frame: FrameState): string[] {
-  return interp.objects.filter((o) => objectMatches(where, o, interp, frame)).map((o) => o.id)
+  return [
+    ...interp.objects.filter((o) => objectMatches(where, o, interp, frame)).map((o) => o.id),
+    ...Object.values(frame.widgets).filter((w) => widgetMatches(where, w, frame)).map((w) => w.id),
+  ]
 }

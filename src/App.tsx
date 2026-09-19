@@ -18,7 +18,7 @@ import { EventInspector } from "./dev/EventInspector"
 import { describePolicies, parseCommand } from "./automation/policies"
 import { splitParagraphs } from "./interpretation/segment"
 import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, isBound, matches, orderFrames, resultHash, today, UNBOUND, type BasisId } from "./frames"
-import { selectIds } from "./query"
+import { selectIds, triplesOf, triplesOfWidget } from "./query"
 import { filterPresentation } from "./projection/present"
 
 export const DEMO_TEXT =
@@ -326,6 +326,14 @@ export function App() {
     if (parsed.thread) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), thread: parsed.thread })); return }
     if (parsed.day) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), day: parsed.day === "today" ? today() : parsed.day })); return }
     if (parsed.where !== undefined) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), where: parsed.where || undefined })); return }
+    if (parsed.widget) {
+      if (!isBound(parseFrameId(frameRef.current))) { setLastReply("widgets are created in a bound frame"); return }
+      const wid = `w-${hashIds([parsed.widget.kind, ...parsed.widget.tags, String(getEvents().length)])}`
+      appendEvent("human_event", "widget_created", { kind: parsed.widget.kind, tags: parsed.widget.tags }, { frame: frameRef.current, objectId: wid })
+      setLastReply(parsed.reply)
+      if (stageRef.current === "editing") { cancelTimeline.current(); setStage("structured"); setPhase("idle") }
+      return
+    }
     if (!parsed.patch) return
     appendEvent("policy_change", "automation_policy_changed", { patch: parsed.patch, utterance: text, before: describePolicies(src.policies) })
     setLastReply(parsed.reply)
@@ -342,6 +350,12 @@ export function App() {
     setFocusedId,
     proposalsFor: (id) => proposalsF.filter((p) => p.shape === "toggle" && p.subject === id),
     implicationsFor: (id) => implicationsFor(interpF, id),
+    keysFor: (id) => {
+      const fr = frameOf(reduce(cutRef.current == null ? getEvents() : getEvents().slice(0, cutRef.current)), fid)
+      const o = interpF.objects.find((x) => x.id === id)
+      const w = fr.widgets[id]
+      return (o ? triplesOf(o, interpF, fr) : w ? triplesOfWidget(w, fr) : []).map((t) => ({ p: t.p, o: t.o }))
+    },
   }), [tendIn, correctIn, affordIn, onLift, focusedId])
 
   const handlers = useMemo(() => handlersFor(frameId, interp, proposals), [handlersFor, frameId, interp, proposals])
@@ -364,12 +378,12 @@ export function App() {
 
   // The frame's identity is its result set: the ids the query returned, hashed.
   const resultIds = useMemo(() => {
-    if (bound) return interp.objects.map((o) => o.id)
+    if (bound) return [...interp.objects.map((o) => o.id), ...Object.keys(frame.widgets)]
     const out: string[] = []
     const walk = (bs: { id: string; children: any[] }[]) => { for (const b of bs) { out.push(b.id); walk(b.children) } }
-    for (const f of digest) { for (const sec of f.presentation.sections) walk(sec.blocks); walk(f.presentation.pinnedBlocks) }
+    for (const f of digest) { for (const sec of f.presentation.sections) walk(sec.blocks); walk(f.presentation.pinnedBlocks); for (const w of f.presentation.widgets) out.push(w.id) }
     return out
-  }, [bound, interp, digest])
+  }, [bound, interp, digest, frame.widgets])
   const hash = resultHash(resultIds)
   const prevIds = useRef<string[]>([])
   const [diff, setDiff] = useState<{ added: number; removed: number }>({ added: 0, removed: 0 })

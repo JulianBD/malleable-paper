@@ -101,11 +101,19 @@ export function orderFrames(ids: string[], threads: string[]): string[] {
   })
 }
 
-/** Parse "key=value" into a content predicate; unknown shapes match nothing. */
-export function parseWhere(where: string | undefined): { key: string; value: string } | null {
-  if (!where) return null
-  const m = /^([a-z]+)=(.+)$/.exec(where.trim().toLowerCase())
-  return m ? { key: m[1], value: m[2] } : null
+export interface Pattern { key: string; value: string }
+
+/** Parse "key=value key2=value2" into a conjunction of triple patterns (?x key value). */
+export function parseWhere(where: string | undefined): Pattern[] {
+  if (!where) return []
+  return where.trim().toLowerCase().split(/\s+/).flatMap((part) => {
+    const m = /^([a-z]+)=(.+)$/.exec(part)
+    return m ? [{ key: m[1], value: m[2] }] : []
+  })
+}
+
+export function normTag(v: string): string {
+  return v.trim().toLowerCase().replace(/[\s_]+/g, "-")
 }
 
 /** Result-set identity: a hash of the ordered object ids a query returned. */

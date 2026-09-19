@@ -241,3 +241,18 @@ input { font: inherit; }
 .digest .block .line { cursor: default; }
 .coord-where { color: var(--rose-d); }
 .identity { font-family: var(--mono); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--teal-d); }
+
+/* ---------- widgets: objects with keys ---------- */
+.widget { border: 2px solid var(--teal-l); padding: 10px 12px 8px; margin: 6px 0 10px; display: grid; gap: 8px; max-width: 420px; }
+.widget-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.widget-head .kind { color: var(--teal-d); display: inline-block; }
+.key { font-family: var(--mono); font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--teal-d); background: var(--teal-l); padding: 1px 6px; }
+.widget .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+.widget .cell { height: 18px; background: var(--paper); border: 1px solid var(--teal-l); }
+.widget .cell.head { background: var(--teal-l); }
+.widget .plot { position: relative; height: 72px; }
+.widget .axis-y { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--teal-d); }
+.widget .axis-x { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--teal-d); }
+.widget .slab { height: 40px; background: var(--teal-l); }
+.widget-keys { display: flex; flex-wrap: wrap; gap: 4px 10px; font-family: var(--mono); text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11px; color: var(--ink-2); }
+.menu-keys { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 6px 8px 2px; border-top: 2px solid var(--teal-l); margin-top: 4px; }

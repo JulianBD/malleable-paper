@@ -15,6 +15,8 @@ export interface BlockHandlers {
   setFocusedId: (id: string | null) => void
   proposalsFor: (id: string) => Proposal[]
   implicationsFor: (id: string) => Implication[]
+  /** Every (key, value) this object carries: the triples a query can match. */
+  keysFor: (id: string) => Array<{ p: string; o: string }>
 }
 
 export const TYPE_MARK: Record<ObjType, string> = { note: "•", question: "?", reflection: "~", intention: "◇", action: "□", reference: "↗" }
@@ -107,6 +109,27 @@ function TendMenu({ block, h, onClose }: { block: Block; h: BlockHandlers; onClo
           <div key={i.key}><span className={`st st-${i.state}`}>{i.state}</span> {i.key.split("|")[1]} · {i.confidence.toFixed(2)} · {i.reason}</div>
         ))}
       </div>
+      <div className="menu-keys generated">
+        {h.keysFor(block.id).map((k, i) => <span key={i} className="key">{k.p}={k.o}</span>)}
+      </div>
+    </div>
+  )
+}
+
+/** A widget is an object with keys and no authored text. Its shape is a stub; its retrievability is the point. */
+export function WidgetBlock({ id, kind, tags, keys }: { id: string; kind: string; tags: string[]; keys: Array<{ p: string; o: string }> }) {
+  return (
+    <div className={`widget widget-${kind}`} data-block={id}>
+      <div className="widget-head">
+        <span className="generated kind" data-flip={id} data-confidence="1">{kind}</span>
+        {tags.map((t) => <span key={t} className="key">{t}</span>)}
+      </div>
+      {kind === "spreadsheet" && (
+        <div className="grid">{Array.from({ length: 12 }).map((_, i) => <span key={i} className={i < 4 ? "cell head" : "cell"} />)}</div>
+      )}
+      {kind === "plot" && <div className="plot"><span className="axis-y" /><span className="axis-x" /></div>}
+      {kind !== "spreadsheet" && kind !== "plot" && <div className="slab" />}
+      <div className="widget-keys generated">{keys.map((k, i) => <span key={i}>{k.p}={k.o}</span>)}</div>
     </div>
   )
 }

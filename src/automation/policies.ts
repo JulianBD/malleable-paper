@@ -61,8 +61,10 @@ export interface ParsedCommand {
   snapshot?: boolean
   /** Navigation along the day basis: "*" = every day, "today" = today. */
   day?: string
-  /** A content filter: "type=action", "mention=sam"; "" clears it. */
+  /** A content filter: "type=action mention=sam"; "" clears it. */
   where?: string
+  /** Create a widget in the current frame: kind plus tags. */
+  widget?: { kind: string; tags: string[] }
   /** Short confirmation for the command line (generated language). */
   reply: string
 }
@@ -78,8 +80,9 @@ export const SEED_COMMANDS = [
   "thread sam",
   "thread *",
   "day *",
-  "where type=action",
-  "where mention=sam",
+  "where type=action mention=sam",
+  "widget spreadsheet projects student-debt",
+  "where about=student-debt",
   "where off",
   "snapshot",
 ]
@@ -93,7 +96,9 @@ export function parseCommand(input: string, context: { currentParagraphs: number
   if (/^(snapshot|page|render)$/.test(t)) return { snapshot: true, reply: "page rendered" }
   if (/^(?:day|days)\s+(\*|all|every)$/.test(t)) return { day: "*", reply: "day → every day" }
   if (/^(?:day)\s+today$/.test(t)) return { day: "today", reply: "day → today" }
-  const wh = /^where\s+([a-z]+=[a-z0-9 -]+)$/.exec(t)
+  const wg = /^widget\s+([a-z][a-z0-9-]*)((?:\s+[a-z0-9][a-z0-9-]*)*)$/.exec(t)
+  if (wg) { const tags = wg[2].trim().split(/\s+/).filter(Boolean); return { widget: { kind: wg[1], tags }, reply: `widget ${wg[1]} · ${tags.join(" · ")}` } }
+  const wh = /^where\s+((?:[a-z]+=[a-z0-9-]+)(?:\s+[a-z]+=[a-z0-9-]+)*)$/.exec(t)
   if (wh) return { where: wh[1].trim(), reply: `where → ${wh[1].trim()}` }
   if (/^where\s+(off|none|clear|\*)$/.test(t)) return { where: "", reply: "where → cleared" }
   if (/^(?:thread|threads)\s+(\*|all|every)$/.test(t)) return { thread: "*", reply: "thread → every thread" }

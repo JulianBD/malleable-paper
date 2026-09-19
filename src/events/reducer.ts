@@ -14,9 +14,16 @@ export interface Correction {
   splitAt?: number
 }
 
+export interface Widget {
+  id: string
+  kind: string
+  tags: string[]
+}
+
 export interface FrameState {
   id: string
   text: string
+  widgets: Record<string, Widget>
   corrections: Record<string, Correction>
   tends: Tends
   statuses: Record<string, string>
@@ -35,7 +42,7 @@ export interface SourceState {
 export const DEFAULT_FRAME = frameId({ day: today(), thread: "journal" })
 
 export function emptyFrame(id: string): FrameState {
-  return { id, text: "", corrections: {}, tends: {}, statuses: {}, pinned: {}, nextMovesDismissedAt: -1, lastTextAt: -1 }
+  return { id, text: "", widgets: {}, corrections: {}, tends: {}, statuses: {}, pinned: {}, nextMovesDismissedAt: -1, lastTextAt: -1 }
 }
 
 export const EMPTY_SOURCE: SourceState = { frames: {}, policies: DEFAULT_POLICIES, eventCount: 0 }
@@ -119,6 +126,8 @@ function step(s: SourceState, ev: LogEvent, index: number): SourceState {
         return { ...fr, pinned }
       })
 
+    case "widget_created":
+      return withFrame(s, frame, (fr) => ({ ...fr, widgets: { ...fr.widgets, [id!]: { id: id!, kind: p.kind, tags: p.tags ?? [] } } }))
     case "implications_ran":
     case "interpretation_ran":
     case "page_rendered":

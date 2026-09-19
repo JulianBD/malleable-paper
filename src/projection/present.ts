@@ -2,7 +2,7 @@
 // Owns treatment, nesting, section order. Owns no authored content and makes
 // no proposals; those come from propose.ts (the doer half).
 
-import type { FrameState, ObjType } from "../events/reducer"
+import type { FrameState, ObjType, Widget } from "../events/reducer"
 import type { Interpretation, InterpretedObject, Label } from "../interpretation/types"
 import type { Intent } from "../interpretation/implications"
 
@@ -44,6 +44,8 @@ export interface Presentation {
   blockById: Record<string, Block>
   /** Blocks the human pinned in the frame; they are not in any section. */
   pinnedBlocks: Block[]
+  /** Widgets created in this frame: objects with keys, no authored text. */
+  widgets: Widget[]
 }
 
 const AFFORDANCE_LABELS: Record<string, string> = {
@@ -87,7 +89,7 @@ export function present(interp: Interpretation, frame: FrameState): Presentation
     }))
     .filter((s) => s.blocks.length > 0)
 
-  return { title: { text: "Today", kind: "generated" }, sections, blockById: byId, pinnedBlocks }
+  return { title: { text: "Today", kind: "generated" }, sections, blockById: byId, pinnedBlocks, widgets: Object.values(frame.widgets) }
 }
 
 function toBlock(o: InterpretedObject, previous: InterpretedObject | undefined, connections: string[], pinned: { x: number; y: number } | null): Block {
@@ -123,5 +125,5 @@ export function filterPresentation(p: Presentation, keep: Set<string>): Presenta
       .map((b) => ({ ...b, children: prune(b.children) }))
       .filter((b) => keep.has(b.id) || b.children.length > 0)
   const sections = p.sections.map((s) => ({ ...s, blocks: prune(s.blocks) })).filter((s) => s.blocks.length > 0)
-  return { ...p, sections, pinnedBlocks: p.pinnedBlocks.filter((b) => keep.has(b.id)) }
+  return { ...p, sections, pinnedBlocks: p.pinnedBlocks.filter((b) => keep.has(b.id)), widgets: p.widgets.filter((w) => keep.has(w.id)) }
 }
