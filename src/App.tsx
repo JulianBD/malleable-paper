@@ -17,7 +17,9 @@ import { CommandLine } from "./chat/CommandLine"
 import { EventInspector } from "./dev/EventInspector"
 import { describePolicies, parseCommand } from "./automation/policies"
 import { splitParagraphs } from "./interpretation/segment"
-import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, isBound, matches, orderFrames, UNBOUND, type BasisId } from "./frames"
+import { frameId as coordId, parseFrameId, step, threadsFrom, formatDay, relativeDay, isBound, matches, orderFrames, resultHash, today, UNBOUND, type BasisId } from "./frames"
+import { selectIds } from "./query"
+import { filterPresentation } from "./projection/present"
 
 export const DEMO_TEXT =
   "I slept kind of badly again and I think I stayed up too late scrolling. Work was fine but I kept avoiding the one thing I actually needed to finish. I felt better after walking to get coffee though. I should probably text Sam back because I've left that sitting for two days. I also keep thinking I want to do something different with my weekends instead of losing Saturday mornings."
@@ -322,6 +324,8 @@ export function App() {
       return
     }
     if (parsed.thread) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), thread: parsed.thread })); return }
+    if (parsed.day) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), day: parsed.day === "today" ? today() : parsed.day })); return }
+    if (parsed.where !== undefined) { setLastReply(parsed.reply); goTo(coordId({ ...parseFrameId(frameRef.current), where: parsed.where || undefined })); return }
     if (!parsed.patch) return
     appendEvent("policy_change", "automation_policy_changed", { patch: parsed.patch, utterance: text, before: describePolicies(src.policies) })
     setLastReply(parsed.reply)
@@ -346,14 +350,36 @@ export function App() {
   const digest: DigestFrame[] = useMemo(() => {
     if (bound) return []
     const ids = orderFrames(Object.keys(source.frames).filter((id) => matches(coord, id) && source.frames[id].text.trim()), threads)
-    return ids.map((id) => {
+    return ids.flatMap((id) => {
       const fr = source.frames[id]
       const it = interpret(fr, source.policies)
       const c = parseFrameId(id)
       const parts = [coord.day === UNBOUND ? (relativeDay(c.day) ?? formatDay(c.day)) : null, coord.thread === UNBOUND ? c.thread : null].filter(Boolean)
-      return { id, label: parts.join(" · "), presentation: present(it, fr), handlers: handlersFor(id, it, propose(it, fr, source.policies)) }
+      const keep = new Set(selectIds(coord.where, it, fr))
+      if (keep.size === 0) return []
+      const pres = coord.where ? filterPresentation(present(it, fr), keep) : present(it, fr)
+      return [{ id, label: parts.join(" · ") || c.thread, presentation: pres, handlers: handlersFor(id, it, propose(it, fr, source.policies)) }]
     })
   }, [bound, source, coord, threads, handlersFor])
+
+  // The frame's identity is its result set: the ids the query returned, hashed.
+  const resultIds = useMemo(() => {
+    if (bound) return interp.objects.map((o) => o.id)
+    const out: string[] = []
+    const walk = (bs: { id: string; children: any[] }[]) => { for (const b of bs) { out.push(b.id); walk(b.children) } }
+    for (const f of digest) { for (const sec of f.presentation.sections) walk(sec.blocks); walk(f.presentation.pinnedBlocks) }
+    return out
+  }, [bound, interp, digest])
+  const hash = resultHash(resultIds)
+  const prevIds = useRef<string[]>([])
+  const [diff, setDiff] = useState<{ added: number; removed: number }>({ added: 0, removed: 0 })
+  useEffect(() => {
+    const before = new Set(prevIds.current), after = new Set(resultIds)
+    const added = resultIds.filter((id) => !before.has(id)).length
+    const removed = prevIds.current.filter((id) => !after.has(id)).length
+    if (added || removed) setDiff({ added, removed })
+    prevIds.current = resultIds
+  }, [hash]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stageLabel = frozen ? "page" : !bound ? "digest" : stage === "editing" ? (listening ? "reading" : "writing") : phase === "idle" ? (raw ? "raw" : "structured") : phase
   const dayLabel = relativeDay(coord.day) ?? formatDay(coord.day)
@@ -362,13 +388,15 @@ export function App() {
   const title = [
     { basis: "day", label: dayLabel, detail: formatDay(coord.day) },
     { basis: "thread", label: threadLabel, detail: "thread" },
+    ...(coord.where ? [{ basis: "where", label: coord.where, detail: "content key filter" }] : []),
     { basis: "time", label: timeLabel, detail: cut == null ? "the log as it is now" : `the log cut at event ${cut} of ${events.length}` },
   ]
+  const identity = `#${hash}${diff.added || diff.removed ? ` · +${diff.added} −${diff.removed}` : ""}`
 
   return (
     <div className={`app stage-${stage}`}>
       <header className="topbar generated">
-        <span className="brand">malleable paper · <span className="coord-day">{dayLabel}</span> · <span className="coord-thread">{threadLabel}</span> · <span className="coord-time">{timeLabel}</span> · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
+        <span className="brand">malleable paper · <span className="coord-day">{dayLabel}</span> · <span className="coord-thread">{threadLabel}</span> · <span className="coord-time">{timeLabel}</span> · <span className="identity" title="hash of the ids this query returned, and what changed since the last render">{identity}</span> · <span className="dot" data-on={listening ? "true" : "false"} /> {stageLabel}</span>
         <span className="controls">
           <button className="ghost" onClick={loadDemo}>load demo</button>
           <button className="ghost" onClick={reset}>reset</button>
@@ -401,7 +429,7 @@ export function App() {
         <CommandLine policies={source.policies} lastReply={lastReply} onCommand={onCommand} focusSignal={cmdFocus} />
       </main>
 
-      <EventInspector events={visible} interp={interp} presentation={presentation} proposals={proposals} frameId={`${dayLabel} · ${threadLabel} · ${timeLabel}`} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
+      <EventInspector events={visible} interp={interp} presentation={presentation} proposals={proposals} frameId={`${dayLabel} · ${threadLabel}${coord.where ? ` · ${coord.where}` : ""} · ${timeLabel} · ${identity}`} open={inspectorOpen} onToggle={() => setInspectorOpen((o) => !o)} />
     </div>
   )
 }

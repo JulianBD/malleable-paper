@@ -86,7 +86,8 @@ input { font: inherit; }
 .flow { position: relative; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--blue-l); }
 .title { margin: 0; }
-.title.tuple { display: flex; gap: 8px; align-items: baseline; }
+.title.tuple { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.title .coord { white-space: nowrap; }
 .coord-thread { color: var(--violet-d); }
 .title .sep { color: var(--rule); margin-right: 8px; }
 .sec { margin: 0 0 28px; }
@@ -238,3 +239,5 @@ input { font: inherit; }
 .member { margin-top: 8px; padding-top: 10px; border-top: 2px solid var(--violet-l); }
 .member-label { color: var(--violet-d); }
 .digest .block .line { cursor: default; }
+.coord-where { color: var(--rose-d); }
+.identity { font-family: var(--mono); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--teal-d); }

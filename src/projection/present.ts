@@ -115,3 +115,13 @@ function toBlock(o: InterpretedObject, previous: InterpretedObject | undefined, 
     reason: o.reason,
   }
 }
+
+/** Keep only the blocks whose id is in `keep` (or that have a kept descendant). */
+export function filterPresentation(p: Presentation, keep: Set<string>): Presentation {
+  const prune = (blocks: Block[]): Block[] =>
+    blocks
+      .map((b) => ({ ...b, children: prune(b.children) }))
+      .filter((b) => keep.has(b.id) || b.children.length > 0)
+  const sections = p.sections.map((s) => ({ ...s, blocks: prune(s.blocks) })).filter((s) => s.blocks.length > 0)
+  return { ...p, sections, pinnedBlocks: p.pinnedBlocks.filter((b) => keep.has(b.id)) }
+}

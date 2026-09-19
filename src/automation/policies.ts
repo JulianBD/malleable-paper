@@ -59,6 +59,10 @@ export interface ParsedCommand {
   thread?: string
   /** Record a page: the current query at the current cut. */
   snapshot?: boolean
+  /** Navigation along the day basis: "*" = every day, "today" = today. */
+  day?: string
+  /** A content filter: "type=action", "mention=sam"; "" clears it. */
+  where?: string
   /** Short confirmation for the command line (generated language). */
   reply: string
 }
@@ -73,6 +77,10 @@ export const SEED_COMMANDS = [
   "Reset to defaults.",
   "thread sam",
   "thread *",
+  "day *",
+  "where type=action",
+  "where mention=sam",
+  "where off",
   "snapshot",
 ]
 
@@ -83,6 +91,11 @@ export function parseCommand(input: string, context: { currentParagraphs: number
   const held = context.policies.journal.heldBack
 
   if (/^(snapshot|page|render)$/.test(t)) return { snapshot: true, reply: "page rendered" }
+  if (/^(?:day|days)\s+(\*|all|every)$/.test(t)) return { day: "*", reply: "day → every day" }
+  if (/^(?:day)\s+today$/.test(t)) return { day: "today", reply: "day → today" }
+  const wh = /^where\s+([a-z]+=[a-z0-9 -]+)$/.exec(t)
+  if (wh) return { where: wh[1].trim(), reply: `where → ${wh[1].trim()}` }
+  if (/^where\s+(off|none|clear|\*)$/.test(t)) return { where: "", reply: "where → cleared" }
   if (/^(?:thread|threads)\s+(\*|all|every)$/.test(t)) return { thread: "*", reply: "thread → every thread" }
   const th = /^(?:thread|go to|open)\s+([a-z0-9][a-z0-9 -]{0,24})$/.exec(t)
   if (th) return { thread: th[1].trim(), reply: `thread → ${th[1].trim()}` }

@@ -14,6 +14,8 @@ export const UNBOUND = "*"
 export interface Coordinate {
   day: string // ISO date, ordered by calendar; or "*"
   thread: string // a named line of frames, ordered by first appearance; or "*"
+  /** A filter over content keys, e.g. "type=action", "mention=sam". Empty = none. */
+  where?: string
 }
 
 export const DEFAULT_THREADS = ["journal", "work", "people"]
@@ -24,16 +26,22 @@ export function today(): string {
 }
 
 export function frameId(c: Coordinate): string {
-  return `day=${c.day}|thread=${c.thread}`
+  return `day=${c.day}|thread=${c.thread}${c.where ? `|where=${c.where}` : ""}`
 }
 
 export function parseFrameId(id: string): Coordinate {
-  const m = /^day=([^|]+)\|thread=(.+)$/.exec(id)
-  return m ? { day: m[1], thread: m[2] } : { day: today(), thread: "journal" }
+  const m = /^day=([^|]+)\|thread=([^|]+)(?:\|where=(.+))?$/.exec(id)
+  return m ? { day: m[1], thread: m[2], where: m[3] || undefined } : { day: today(), thread: "journal" }
 }
 
+/** A concrete frame: every basis bound and no filter. Only these hold text. */
 export function isBound(c: Coordinate): boolean {
-  return c.day !== UNBOUND && c.thread !== UNBOUND
+  return c.day !== UNBOUND && c.thread !== UNBOUND && !c.where
+}
+
+/** The concrete frame a query writes into, if it has one. */
+export function concrete(c: Coordinate): Coordinate {
+  return { day: c.day, thread: c.thread }
 }
 
 /** Does a concrete frame id fall inside a query coordinate? */
@@ -91,4 +99,18 @@ export function orderFrames(ids: string[], threads: string[]): string[] {
     const ta = threads.indexOf(ca.thread), tb = threads.indexOf(cb.thread)
     return ta - tb || ca.day.localeCompare(cb.day)
   })
+}
+
+/** Parse "key=value" into a content predicate; unknown shapes match nothing. */
+export function parseWhere(where: string | undefined): { key: string; value: string } | null {
+  if (!where) return null
+  const m = /^([a-z]+)=(.+)$/.exec(where.trim().toLowerCase())
+  return m ? { key: m[1], value: m[2] } : null
+}
+
+/** Result-set identity: a hash of the ordered object ids a query returned. */
+export function resultHash(ids: string[]): string {
+  let h = 2166136261
+  for (const id of ids) for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return (h >>> 0).toString(36).padStart(7, "0").slice(0, 6)
 }
