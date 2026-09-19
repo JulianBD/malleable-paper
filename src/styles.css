@@ -45,7 +45,7 @@ input { font: inherit; }
 .link { border-bottom: 2px solid var(--blue-d); }
 
 /* ---------- plane & frame ---------- */
-.plane { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 32px 120px; }
+.plane { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 32px 60px; }
 .frame-host { position: relative; width: min(1120px, 100%); min-height: 72vh; }
 .column { padding: 28px var(--col-pad) 40px; width: var(--flow-w); }
 .empty-hint { padding: 0 var(--col-pad); margin-top: -14px; }
@@ -79,7 +79,7 @@ input { font: inherit; }
 .frame.raw .flow, .frame.raw .pinned-layer { opacity: 0.06; transition: opacity 200ms; }
 
 /* ---------- flow column ---------- */
-.flow { position: relative; z-index: 1; }
+.flow { position: relative; }
 .title-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--blue-l); }
 .title { margin: 0; }
 .sec { margin: 0 0 28px; }
@@ -139,7 +139,7 @@ input { font: inherit; }
 .clarify button { color: var(--amber-d); background: var(--amber-l); padding: 1px 8px; }
 .clarify button:hover { background: var(--amber-d); color: #fff; }
 
-.menu { position: absolute; z-index: 6; left: 28px; top: 100%; margin-top: 6px; background: #fff; border: 2px solid var(--blue-l); padding: 6px; display: flex; flex-direction: column; gap: 2px; min-width: 320px; }
+.menu { position: absolute; z-index: 15; left: 28px; top: 100%; margin-top: 6px; background: #fff; border: 2px solid var(--blue-l); padding: 6px; display: flex; flex-direction: column; gap: 2px; min-width: 320px; }
 .menu > button { text-align: left; padding: 5px 8px; color: var(--ink-2); }
 .menu > button:hover { background: var(--blue-l); color: var(--blue-d); }
 .menu-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 5px 8px; }
@@ -159,7 +159,7 @@ input { font: inherit; }
 
 /* ---------- pinned layer ---------- */
 .pinned-layer { position: absolute; inset: 0; pointer-events: none; }
-.pinned-layer .block { position: absolute; pointer-events: auto; width: 240px; padding-left: 28px; }
+.pinned-layer .block { position: absolute; pointer-events: auto; width: 300px; padding-left: 28px; }
 .pinned-layer .block .line { cursor: grab; }
 .pinned-layer .block .authored { font-size: 16px; }
 .pinned-layer .block.child { padding-left: 28px; }
@@ -194,7 +194,7 @@ input { font: inherit; }
 @keyframes enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 /* ---------- command line ---------- */
-.command { width: min(1120px, 100%); padding: 10px var(--col-pad) 0; }
+.command { position: sticky; bottom: 34px; z-index: 10; background: var(--paper); width: min(1120px, 100%); padding: 10px var(--col-pad) 10px; }
 .command-line { display: flex; gap: 12px; align-items: baseline; border-top: 2px solid var(--violet-l); padding-top: 10px; }
 .command-line .slash { color: var(--violet-d); font-size: 14px; }
 .command-line input { flex: 0 1 380px; border: none; background: none; color: var(--ink); outline: none; padding: 0; font-size: 15px; font-weight: 500; letter-spacing: 0; text-transform: none; }

@@ -40,7 +40,7 @@ export function propose(interp: Interpretation, frame: FrameState, policies: Pol
   }
 
   // A nesting proposal for a pair outranks a nearness proposal for the same pair.
-  const nested = new Set(interp.implications.filter((i) => i.claim.kind === "parent" && i.producer === "scanner" && i.state === "proposed").map((i) => [i.subject, (i.claim as { parentId: string }).parentId].sort().join("+")))
+  const nested = new Set(interp.implications.filter((i) => i.claim.kind === "parent" && i.state !== "rejected").map((i) => [i.subject, (i.claim as { parentId: string }).parentId].sort().join("+")))
   if (holds(policies, "offer-connections")) {
     for (const i of interp.implications) {
       if (i.claim.kind === "near" && i.state === "proposed" && obj(i.subject) && obj(i.claim.otherId) && !nested.has([i.subject, i.claim.otherId].sort().join("+"))) {

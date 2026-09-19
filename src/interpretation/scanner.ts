@@ -5,9 +5,9 @@ import type { FrameState } from "../events/reducer"
 import { claimKey, nearKey, stateOf, type Implication } from "./implications"
 import type { InterpretedObject } from "./types"
 
-export const NODE_W = 240
+export const NODE_W = 300
 export function estimateHeight(text: string): number {
-  return 28 + Math.max(1, Math.ceil(text.length / 26)) * 24
+  return 28 + Math.max(1, Math.ceil(text.length / 32)) * 24
 }
 
 interface Box { id: string; x: number; y: number; w: number; h: number }
