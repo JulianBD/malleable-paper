@@ -1,0 +1,21 @@
+{
+  "name": "malleable-paper",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run serve.ts",
+    "build": "bun build src/main.tsx --outdir dist --target browser",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19",
+    "react-dom": "19",
+    "wordgard": "0.5.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
