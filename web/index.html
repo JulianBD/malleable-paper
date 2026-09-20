@@ -8,13 +8,10 @@
 </head>
 <body>
   <main id="plane">
-    <section id="left">
-      <section id="playground"></section>
-      <article class="box doc" id="doc"></article>
-    </section>
-    <section id="right">
-      <article class="box doc reader" id="contract"></article>
-    </section>
+    <div id="frame-title"></div>
+    <button class="frame-nav" id="fprev">‹</button>
+    <button class="frame-nav" id="fnext">›</button>
+    <div id="frames"></div>
   </main>
 
   <footer id="meta">
@@ -38,7 +35,7 @@
     // type declares which quadrant is solid. A bound applies only if you
     // approach it (direction guard), and axes resolve dominant-first.
     const plane = document.getElementById('plane');
-    const playground = document.getElementById('playground');
+    let playground = null; // set when the geometry frame is built
     const boxes = [
       { name: 'A', x: 40, y: 40, w: 200, h: 140 },
       { name: 'B', x: 0, y: 40, w: 200, h: 140 },
@@ -47,6 +44,7 @@
     const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
     function render() {
+      if (!playground) return; // geometry frame not mounted
       boxes.forEach((b, i) => {
         let el = document.getElementById('box' + i);
         if (!el) {
@@ -224,7 +222,7 @@ axis-pure. The honest fix is a
 earned when a recorded
 trajectory proves it matters.`,
     ];
-    makeDoc(document.getElementById('doc'), PAGES);
+
 
     const CONTRACT = `The corner contract
 
@@ -239,7 +237,6 @@ Approach. A corner bounds you only if you approach it. A box sitting to your wes
 Order. When a drag moves diagonally, the dominant axis resolves first, and the second axis then measures overlap against the updated position — so a box sliding up-and-out from beside a neighbor is free the moment its edge actually clears, not stuck until you release and re-grab.
 
 One clause is still owed: a box flanked on both axes at once — one neighbor east, another south — can lock in a corner, because no ordering of two 1-dimensional resolutions escapes a 2-dimensional trap. The contract will close when a recorded trajectory earns the full corner-contact resolve: corners meeting corners, not edges sweeping spans.`;
-    makeDoc(document.getElementById('contract'), [CONTRACT], false);
 
     // ——— gestures: drag in the playground, swipe in doc boxes ———
     let swipe = null;
@@ -321,9 +318,63 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       plane.releasePointerCapture(e.pointerId);
     });
 
-    // park B on the other side of the playground
-    boxes[1].x = playground.clientWidth - boxes[1].w - 40;
-    render();
+    const LANDSCAPE = `React, and what we built instead — the landscape
+
+What React does. A component tree owns state in pieces (useState, useReducer); every setState schedules a re-render of the affected subtree; the framework re-runs your components, diffs the result against a virtual DOM, and commits the minimal set of real DOM mutations. The promise is declarativity: UI = f(state), and the framework owns the render loop so you never touch the DOM directly.
+
+What the others do. Solid and Svelte 5 compile away the VDOM: state is fine-grained signals/runes, each with its own subscriber list, and a write to one cell updates exactly the DOM nodes that read it. Vue makes plain objects reactive with proxies. All of them share one assumption: state is in-memory, per-session, and ephemeral — persistence is a bolt-on (a store, a query cache, localStorage), never the state itself.
+
+What we have. The page as it stands already is a hand-rolled reactive framework, one where the assumptions invert:
+
+- the event log is the store — durable, external, shared, append-only
+- the fold (when built) is the selector: state = fold(events)
+- render() is the commit phase: imperatively patching styles from state
+- the 2s poll is the subscription; ?since=N cursors are the diff protocol
+
+So the question this frame holds: is the proposal (a) React (or Solid, or nothing) mounted over an event-log store — log as useSyncExternalStore, folds as selectors, components as projections; or (b) no framework at all — the DOM itself as a projection, boxes as materialized views of log events, gestures writing events directly? And the sub-questions that follow: where does 60Hz gesture state live if state is events (direct manipulation must not round-trip the log per frame — the gesture/act split we already ruled); who owns layout (CSS vs fold); and what hydration means when refresh re-folds the log into geometry.
+
+Julian's proposal and the exploration belong in this frame — annotate, drag, and message; the discussion will be folded in as it happens.`;
+
+    // ——— frames: switchable views of the paper ———
+    const FRAMES = [
+      {
+        title: 'geometry · the corner contract',
+        build() {
+          document.getElementById('frames').innerHTML =
+            '<section id="left"><section id="playground"></section><article class="box doc" id="doc"></article></section>' +
+            '<section id="right"><article class="box doc reader" id="contract"></article></section>';
+          playground = document.getElementById('playground');
+          makeDoc(document.getElementById('doc'), PAGES);
+          makeDoc(document.getElementById('contract'), [CONTRACT], false);
+          boxes[1].x = playground.clientWidth - boxes[1].w - 40;
+          render();
+        },
+      },
+      {
+        title: 'frameworks · state & projection',
+        build() {
+          document.getElementById('frames').innerHTML =
+            '<section id="left" class="col"><article class="box doc reader" id="fw"></article></section>';
+          makeDoc(document.getElementById('fw'), [LANDSCAPE], false);
+          playground = null;
+        },
+      },
+    ];
+
+    let frame = 0;
+    function switchFrame(n) {
+      frame = Math.max(0, Math.min(FRAMES.length - 1, n));
+      document.getElementById('frame-title').textContent = (frame + 1) + '/' + FRAMES.length + ' · ' + FRAMES[frame].title;
+      FRAMES[frame].build();
+    }
+    document.getElementById('fprev').addEventListener('click', () => switchFrame(frame - 1));
+    document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
+    document.addEventListener('keydown', (e) => {
+      if (e.target === t) return; // typing in the chat bar
+      if (e.key === 'ArrowLeft') switchFrame(frame - 1);
+      if (e.key === 'ArrowRight') switchFrame(frame + 1);
+    });
+    switchFrame(0);
 
     // ——— meta drawer ———
     const f = document.getElementById('f'),
