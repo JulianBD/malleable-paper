@@ -63,7 +63,7 @@
     .log .msg { margin: 2px 0; white-space: pre-wrap; }
     .log .who { font-weight: 600; margin-right: 8px; }
     .log .ts { font-size: 11px; color: #666; margin-left: 8px; }
-    .log .agent .who::after { content: " · agent"; font-weight: 400; }
+    .log .human .who::after { content: " · julian"; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -78,6 +78,12 @@
           t = document.getElementById('t'),
           b = document.getElementById('b'),
           s = document.getElementById('s');
+    t.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        f.requestSubmit();
+      }
+    });
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
       const text = t.value.trim();
@@ -113,7 +119,7 @@
             div.className = 'msg ' + (e.kind === 'agent_message' ? 'agent' : 'human');
             const who = document.createElement('span');
             who.className = 'who';
-            who.textContent = e.kind === 'agent_message' ? 'julian' : 'you';
+            who.textContent = e.kind === 'agent_message' ? 'paper' : 'you';
             const text = document.createElement('span');
             text.textContent = e.text;
             const ts = document.createElement('span');
