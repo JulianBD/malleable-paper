@@ -481,6 +481,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         el.className = 'card ' + status;
         let html = '<div class="card-head"><strong>' + c.title + '</strong>' +
           '<span class="card-status">' + status + '</span></div>';
+        if (c.blurb) html += '<p class="card-blurb">' + c.blurb + '</p>';
         if (c.table) {
           html += '<table><tr>' + c.table.columns.map((h) => '<th>' + h + '</th>').join('') + '</tr>';
           for (const r of c.table.rows) html += '<tr>' + r.map((x) => '<td>' + x + '</td>').join('') + '</tr>';

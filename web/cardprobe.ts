@@ -7,21 +7,7 @@ await page.keyboard.press("ArrowRight");
 await page.keyboard.press("ArrowRight");
 await page.waitForTimeout(400);
 console.log("cards:", await page.locator(".card").count());
-console.log("radios:", await page.locator(".card input[type=radio]").count());
-console.log("textarea:", await page.locator(".card textarea").count());
-// full round-trip on a throwaway card: post, fill, submit, verify ruled
-const r = await page.evaluate(async () => {
-  await fetch('/event', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind: 'card', id: 'T-form-probe', title: 'test card (probe, ignore)',
-      form: { fields: [{ ref: 'X', options: [{ k: 'a', label: 'yes' }, { k: 'b', label: 'no' }] }] } }) });
-  return true;
-});
-console.log("test card posted:", r);
-await page.waitForTimeout(2500); // next poll renders it
-await page.locator('.card:has-text("test card") input[value="a"]').check();
-await page.locator('.card:has-text("test card") textarea').fill('probe write-in');
-await page.locator('.card:has-text("test card") button').click();
-await page.waitForTimeout(2500);
-console.log("test card status:", await page.locator('.card:has-text("test card") .card-status').textContent());
-await page.screenshot({ path: "web/shots/04-card-form.png" });
+console.log("blurb:", (await page.locator(".card-blurb").first().textContent())?.slice(0, 60));
+console.log("radios:", await page.locator(".card.pending input[type=radio]").count());
+await page.screenshot({ path: "web/shots/05-card-blurb.png", fullPage: false });
 await browser.close();

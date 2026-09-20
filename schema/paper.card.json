@@ -16,22 +16,42 @@
           "kind":   {"const": "card"},
           "id":     {"type": "string", "comment": "fold key — latest card per id wins"},
           "title":  {"type": "string"},
+          "blurb":  {"type": "string", "comment": "the actual ask: context and decision, above the table"},
           "status": {"enum": ["pending", "ruled"], "comment": "presentation hint only; a card_response overrides"},
-          "table":  {"type": "object", "properties": {
-            "columns": {"type": "array", "items": {"type": "string"}},
-            "rows":    {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
-          }},
-          "form": {"type": "object", "properties": {
-            "fields": {"type": "array", "items": {"type": "object",
-              "required": ["ref", "options"],
-              "properties": {
-                "ref": {"type": "string"},
-                "options": {"type": "array", "items": {"type": "object",
-                  "required": ["k", "label"],
-                  "properties": {"k": {"type": "string"}, "label": {"type": "string"}}}}
-              }}}},
-            "writein": {"type": "boolean", "comment": "currently unconditional"}
-          }},
+          "table": {
+            "type": "object",
+            "properties": {
+              "columns": {"type": "array", "items": {"type": "string"}},
+              "rows":    {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+            }
+          },
+          "form": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ref", "options"],
+                  "properties": {
+                    "ref": {"type": "string"},
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["k", "label"],
+                        "properties": {
+                          "k":     {"type": "string"},
+                          "label": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "writein": {"type": "boolean", "comment": "currently unconditional"}
+            }
+          },
           "note": {"type": "string"}
         }
       },
@@ -55,7 +75,7 @@
     "fold": "latest card per id; latest card_response per card id",
     "states": {
       "pending": {"on": {"card_response[card=self]": "ruled"}},
-      "ruled":   {"on": {"card[id=self]": "pending", "comment": "re-posting the id reopens — supersede pattern"}}
+      "ruled":   {"on": {"card[id=self]": "pending — re-posting the id reopens (supersede pattern)"}}
     },
     "derives": {
       "outstanding": "cards with no response — the 'what paper wants' list"
@@ -73,13 +93,13 @@
 
   "render": {
     "element": "#cardfield",
-    "template": "bordered card: title, status badge, optional table, optional radio form + write-in textarea + 'rule it' button; ruled cards dim and show the ruling",
+    "template": "bordered card: title, status badge, blurb, optional table, optional radio form + write-in textarea + 'rule it' button; ruled cards dim and show the ruling",
     "ephemeral": ["radio selection before submit", "write-in draft"]
   },
 
   "knownGaps": [
     "no card_delete / expiry — the T-form-probe test card renders forever (labeled 'ignore')",
-    "no agent-side notification beyond the extension steer; a ruled card while extension is unloaded is silent",
+    "no agent-side notification beyond the extension steer; a ruled card while the extension is unloaded is silent",
     "writein flag declared in schema but render always shows the textarea"
   ]
 }
