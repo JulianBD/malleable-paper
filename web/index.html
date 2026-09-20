@@ -217,6 +217,7 @@ the first draft dropped it)`,
     // swipe pages on the doc box (it is not draggable)
     let swipe = null;
     plane.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.nav')) return; // let the page buttons click
       const docEl = e.target.closest('.box.doc');
       if (docEl) {
         swipe = { el: docEl, px: e.clientX, page: +docEl.querySelector('.pager').textContent.split('/')[0] - 1 };
@@ -235,6 +236,7 @@ the first draft dropped it)`,
       e.preventDefault();
     });
 
+    let lastSample = 0;
     plane.addEventListener('pointermove', (e) => {
       if (!drag) return;
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
@@ -243,6 +245,12 @@ the first draft dropped it)`,
         : tryResize(drag.start, drag.corner, dx, dy);
       Object.assign(boxes[drag.i], g);
       render();
+      // motion capture while recording: throttled samples, then the release act
+      if (recording && Date.now() - lastSample > 80) {
+        lastSample = Date.now();
+        const b = boxes[drag.i];
+        logEvent({ kind: 'box_drag', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
+      }
     });
 
     // record: toggle position tracking — snapshot on start, then every release
