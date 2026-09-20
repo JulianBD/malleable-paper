@@ -11,10 +11,22 @@ import { join, dirname } from "node:path";
 const root = dirname(fileURLToPath(import.meta.url));
 const LOG = join(root, "..", "events.jsonl");
 
+async function readEvents() {
+  try {
+    const raw = await Bun.file(LOG).text();
+    return raw.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  } catch {
+    return []; // no log yet
+  }
+}
+
 const server = Bun.serve({
   port: 5174,
   async fetch(req) {
     const url = new URL(req.url);
+    if (req.method === "GET" && url.pathname === "/events") {
+      return Response.json(await readEvents());
+    }
     if (req.method === "POST" && url.pathname === "/message") {
       let body: { text?: unknown };
       try {
