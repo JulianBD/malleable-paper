@@ -14,6 +14,7 @@
 import { appendFile, readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { evaluate } from "./lisp";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const LOG = join(root, "..", "events.jsonl");
@@ -80,8 +81,24 @@ async function drain() {
   if (!queue.length) return;
   const batch = queue;
   queue = [];
-  const lines = [];
+  // eval acts expand first: a program's products join this same drain,
+  // validated like anything else. The eval event itself is logged (with
+  // what it emitted) — the audit trail is: program, then products.
+  const expanded = [];
   for (const act of batch) {
+    if (act.kind === "eval") {
+      try {
+        const products = evaluate(String(act.program ?? ""), String(act.actor ?? "agent"));
+        expanded.push({ ...act, emitted: products.map((p) => p.kind) }, ...products);
+      } catch (e) {
+        rejects.push({ act, why: `eval failed: ${e.message}`, ts: new Date().toISOString() });
+      }
+    } else {
+      expanded.push(act);
+    }
+  }
+  const lines = [];
+  for (const act of expanded) {
     const required = registry.get(act.kind);
     if (!required) {
       rejects.push({ act, why: `unknown kind '${act.kind}' — no lexicon emits it`, ts: new Date().toISOString() });

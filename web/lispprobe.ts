@@ -1,0 +1,12 @@
+import { chromium } from "/Users/juliandorsey/Code/malleable-paper/prototypes/interaction/node_modules/playwright/index.js";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.goto("http://localhost:5174", { waitUntil: "networkidle" });
+await page.waitForTimeout(3000);
+console.log("title:", await page.locator("#frame-title").textContent());
+for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(300);
+console.log("frame 6:", await page.locator("#frame-title").textContent());
+console.log("body:", (await page.locator(".dynframe").textContent())?.slice(0, 90));
+await page.screenshot({ path: "shots/12-lisp-born.png" });
+await browser.close();
