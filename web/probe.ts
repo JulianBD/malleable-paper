@@ -18,28 +18,30 @@ async function shot(name: string) {
   console.log("shot", name);
 }
 
+async function geom(id: string) {
+  const b = await page.locator(id).boundingBox();
+  return b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+}
+
+console.log("A", await geom("#box0"), "B", await geom("#box1"));
 await shot("01-plane");
 await page.click("#toggle");
 await page.waitForTimeout(300);
 await shot("02-meta-open");
-// flip the doc box to page 3 (move clamp)
-await page.click("#box2 .next");
-await page.click("#box2 .next");
-await shot("03-doc-page3");
-// drag box0 rightward into box1 — demonstrates the direction-blind bug
-const b0 = await page.locator("#box0").boundingBox();
-const b1 = await page.locator("#box1").boundingBox();
-if (b0 && b1) {
-  await page.mouse.move(b0.x + b0.width / 2, b0.y + b0.height / 2);
-  await page.mouse.down();
-  // first: drag right toward box1 (should stop at contact)
-  await page.mouse.move(b1.x + 40, b0.y + b0.height / 2, { steps: 10 });
-  await shot("04-drag-right-contact");
-  // then: drag LEFT — bug teleports it past box1 to the right edge
-  await page.mouse.move(20, b0.y + b0.height / 2, { steps: 10 });
-  await shot("05-drag-left-bug");
-  await page.mouse.up();
-}
-await shot("06-after-release");
 
+// drag A across the playground toward B (contact), then away (escape)
+const a = await page.locator("#box0").boundingBox();
+const b = await page.locator("#box1").boundingBox();
+if (a && b) {
+  const cy = a.y + a.height / 2;
+  await page.mouse.move(a.x + a.width / 2, cy);
+  await page.mouse.down();
+  await page.mouse.move(b.x - 10, cy, { steps: 10 });
+  console.log("contact", await geom("#box0"));
+  await shot("03-contact");
+  await page.mouse.move(a.x, a.y + 250, { steps: 10 }); // diagonal down-left escape
+  console.log("escape", await geom("#box0"));
+  await page.mouse.up();
+  await shot("04-escape");
+}
 await browser.close();
