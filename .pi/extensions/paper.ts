@@ -1,13 +1,14 @@
-// paper.ts — the inbound half of the browser channel, as a project-local
-// pi extension. Watches events.jsonl from the malleable-paper umbrella;
-// each new human_message arrives in this session as a user message
-// (steer if streaming, immediate if idle). The reply path stays manual:
-// the agent appends agent_message to the log (bash), the browser polls it.
+// paper.ts — the engine-side peer of the paper, as a project-local pi
+// extension. Both directions go through the queue (web/server.ts):
+// inbound, GET /events?since=N (cursor persisted in .paper-offset for
+// restart survival); outbound, each settled turn's final assistant text
+// is POSTed to /act as an agent_message. No direct file access — the
+// extension is a queue client like any other subscriber.
 //
 // One session, no subagent: the log is the authority; pi is a peer.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFile, writeFile, appendFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LOG = join(HERE, "..", "..", "events.jsonl");
 const OFFSET = join(HERE, "..", "..", ".paper-offset");
+const API = process.env.PAPER_URL ?? "http://localhost:5174";
 const TEST = !!process.env.PAPER_TEST; // set for harness runs: never touch the real log
 
 export default function (pi: ExtensionAPI) {
@@ -37,39 +39,46 @@ export default function (pi: ExtensionAPI) {
   pi.on("agent_settled", async () => {
     if (TEST || !lastReplyText) return;
     const text = lastReplyText;
-    lastReplyText = null;
-    await appendFile(
-      LOG,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        kind: "agent_message",
-        // R1 + R2 (ruled 13:35): id and actor on every message
-        id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
-        actor: "agent",
-        text,
-      }) + "\n",
-    ).catch(() => {});
-  });
-
-  async function readLines(): Promise<any[]> {
     try {
-      const raw = await readFile(LOG, "utf8");
-      return raw.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+      const r = await fetch(`${API}/act`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "agent_message",
+          // R1 + R2 (ruled 13:35): id and actor on every message
+          id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          actor: "agent",
+          text,
+        }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      lastReplyText = null;
     } catch {
-      return [];
+      // server down: keep the text, retry at the next settle
     }
-  }
+  });
 
   async function tick() {
     if (offset < 0) {
       // first poll: start from the end of the log
-      offset = (await readLines()).length;
+      try {
+        const r = await fetch(`${API}/events`);
+        offset = (await r.json()).length;
+      } catch {
+        return; // server down; try again next tick
+      }
       await writeFile(OFFSET, String(offset)).catch(() => {});
       return;
     }
-    const events = await readLines();
-    for (let i = offset; i < events.length; i++) {
-      const e = events[i];
+    let fresh: any[] = [];
+    let cursor = offset;
+    try {
+      const r = await fetch(`${API}/events?since=${offset}`);
+      ({ events: fresh, cursor } = await r.json());
+    } catch {
+      return;
+    }
+    for (const e of fresh) {
       let text: string | null = null;
       const stamp = e.ts?.slice(11, 19) ?? "";
       if (e.kind === "human_message") text = `[browser ${stamp}] ${e.text}`;
@@ -83,7 +92,7 @@ export default function (pi: ExtensionAPI) {
         pi.sendUserMessage(text);
       }
     }
-    offset = events.length;
+    offset = cursor;
     await writeFile(OFFSET, String(offset)).catch(() => {});
   }
 
@@ -91,7 +100,7 @@ export default function (pi: ExtensionAPI) {
     if (TEST || !existsSync(LOG)) return; // not in the paper project / harness
     timer = setInterval(tick, 1500);
     await tick();
-    ctx.ui.notify("paper: watching events.jsonl", "info");
+    ctx.ui.notify("paper: watching the queue at " + API, "info");
   });
 
   pi.on("session_shutdown", async () => {
