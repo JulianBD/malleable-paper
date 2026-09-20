@@ -320,3 +320,10 @@
 {"ts":"2026-09-20T19:25:42.156Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":622,"w":160,"h":56}}
 {"ts":"2026-09-20T19:25:44.921Z","actor":"julian","kind":"edge","id":"n_1789932319113_rhip>n-card","from":"n_1789932319113_rhip","to":"n-card","label":""}
 {"ts":"2026-09-20T19:25:55.003Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":172,"w":200,"h":140}}
+{"ts":"2026-09-20T19:26:18.125Z","kind":"agent_message","id":"m_1789932378101_3foy","actor":"agent","text":"Found it — `render()` sets the label text only when *creating* the element; an existing box never gets its label reprojected. Classic partial-reprojection gap (the thing unit 8 exists to fix properly, but this bit is now):"}
+{"ts":"2026-09-20T20:42:51.380Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T20:42:54.138Z","actor":"julian","kind":"edge","id":"n_1789932319113_rhip>n-card","from":"n_1789932319113_rhip","to":"n-card","label":""}
+{"ts":"2026-09-20T20:43:14.222Z","actor":"paper","kind":"node","id":"n_1789932264908_5lch","label":"probe scaffold 2","node_kind":"object","geom":{"x":40,"y":780,"w":150,"h":48}}
+{"ts":"2026-09-20T20:43:14.222Z","actor":"paper","kind":"node","id":"n_1789932319113_rhip","label":"probe scaffold 3","node_kind":"object","geom":{"x":40,"y":850,"w":150,"h":48}}
+{"ts":"2026-09-20T20:43:23.543Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T20:43:26.304Z","actor":"julian","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card","label":""}

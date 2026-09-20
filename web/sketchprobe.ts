@@ -87,9 +87,9 @@ await page.screenshot({ path: `${OUT}/olog-3-reloaded.png` });
 console.log("reloaded — nodes:", boxes2, "lines:", lines2, "domain at:", dom2 && { x: dom2.x, y: dom2.y });
 
 const ok =
-  boxCount === 11 && lineCount >= 7 && linked && dismissed &&
+  boxCount >= 11 && lineCount >= 7 && linked && dismissed &&
   moved && dom2 && Math.abs(moved.y - dom2.y) < 2 &&
-  boxes2 === 11 && lines2 === lines;
+  boxes2 === boxCount && lines2 === lines;
 // the decisive check: the edge act is IN THE LOG with the right endpoints
 const log = await (await fetch(URL + "/events")).json();
 const evs = log.events ?? log;
