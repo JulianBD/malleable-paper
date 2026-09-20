@@ -62,32 +62,32 @@
     const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
     const xOver = (x0, x1, o) => x0 < o.x + o.w && o.x < x1;
 
-    function tryMove(b, dx, dy) {
+    function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
       const pw = plane.clientWidth, ph = plane.clientHeight;
-      const others = boxes.filter((o) => o !== b);
+      const others = boxes.filter((o) => o !== drag.target);
       // x axis: west corners (NW/SW) bound eastward motion, east corners (NE/SE) westward
-      let x = b.x + dx;
+      let x = s.x + dx;
       for (const o of others) {
-        if (!yOver(b.y, b.y + b.h, o)) continue;
-        if (dx > 0) x = Math.min(x, o.x - b.w);
+        if (!yOver(s.y, s.y + s.h, o)) continue;
+        if (dx > 0) x = Math.min(x, o.x - s.w);
         if (dx < 0) x = Math.max(x, o.x + o.w);
       }
-      x = clamp(x, 0, pw - b.w);
+      x = clamp(x, 0, pw - s.w);
       // y axis, with x already applied: north corners bound downward motion, south corners upward
-      let y = b.y + dy;
+      let y = s.y + dy;
       for (const o of others) {
-        if (!xOver(x, x + b.w, o)) continue;
-        if (dy > 0) y = Math.min(y, o.y - b.h);
+        if (!xOver(x, x + s.w, o)) continue;
+        if (dy > 0) y = Math.min(y, o.y - s.h);
         if (dy < 0) y = Math.max(y, o.y + o.h);
       }
-      y = clamp(y, 0, ph - b.h);
-      b.x = x; b.y = y;
+      y = clamp(y, 0, ph - s.h);
+      return { x, y };
     }
 
-    function tryResize(b, corner, dx, dy) {
+    function tryResize(s, corner, dx, dy) { // returns final {x, y, w, h}
       const pw = plane.clientWidth, ph = plane.clientHeight;
-      const others = boxes.filter((o) => o !== b);
-      const e = { x: b.x, y: b.y, r: b.x + b.w, b: b.y + b.h };
+      const others = boxes.filter((o) => o !== drag.target);
+      const e = { x: s.x, y: s.y, r: s.x + s.w, b: s.y + s.h };
       let { x, y } = e, r = e.r, btm = e.b;
       if (corner.includes('e')) {
         r = e.r + dx;
@@ -109,7 +109,7 @@
         for (const o of others) if (xOver(e.x, e.r, o)) y = Math.max(y, o.y + o.h); // o's south corners
         y = clamp(y, 0, e.b - 20);
       }
-      b.x = x; b.y = y; b.w = r - x; b.h = btm - y;
+      return { x, y, w: r - x, h: btm - y };
     }
 
     plane.addEventListener('pointerdown', (e) => {
@@ -118,18 +118,19 @@
       const i = +boxEl.dataset.i;
       const handle = e.target.closest('.handle');
       drag = handle
-        ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] } }
-        : { i, mode: 'move', px: e.clientX, py: e.clientY, start: { ...boxes[i] } };
+        ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i] }
+        : { i, mode: 'move', px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i] };
       plane.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
 
     plane.addEventListener('pointermove', (e) => {
       if (!drag) return;
-      const b = boxes[drag.i];
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
-      if (drag.mode === 'move') tryMove(b, dx, dy);
-      else tryResize(b, drag.corner, dx, dy);
+      const g = drag.mode === 'move'
+        ? tryMove(drag.start, dx, dy)
+        : tryResize(drag.start, drag.corner, dx, dy);
+      Object.assign(boxes[drag.i], g);
       render();
     });
 
@@ -189,6 +190,20 @@
       }
     });
 
+    // tiny markdown subset: code blocks, inline code, bold, italic, links, lists, paragraphs
+    function md(src) {
+      let s = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      s = s.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      s = s.replace(/(^|\n)((?:- .*\n?)+)/g, (_, pre, list) =>
+        pre + '<ul>' + list.trim().split('\n').map((l) => '<li>' + l.slice(2) + '</li>').join('') + '</ul>');
+      return s.split(/\n{2,}/).map((p) =>
+        /^<(ul|pre)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+    }
+
     let seen = -1;
     async function poll() {
       try {
@@ -200,16 +215,17 @@
           for (const e of events) {
             if (e.kind !== 'human_message' && e.kind !== 'agent_message') continue;
             const p = document.createElement('p');
-            p.className = e.kind === 'agent_message' ? 'agent' : 'human';
+            p.className = 'msg ' + (e.kind === 'agent_message' ? 'agent' : 'human');
             const who = document.createElement('span');
             who.className = 'who';
             who.textContent = e.kind === 'agent_message' ? 'paper' : 'you';
-            const text = document.createElement('span');
-            text.textContent = e.text;
+            const body = document.createElement('span');
+            body.className = 'body';
+            body.innerHTML = md(e.text);
             const ts = document.createElement('span');
             ts.className = 'ts';
             ts.textContent = e.ts.slice(11, 19);
-            p.append(who, text, ts);
+            p.append(who, body, ts);
             log.append(p);
           }
           if (wasBottom || meta.classList.contains('open')) log.scrollTop = log.scrollHeight;
