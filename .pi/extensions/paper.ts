@@ -7,7 +7,7 @@
 // One session, no subagent: the log is the authority; pi is a peer.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,23 @@ const OFFSET = join(HERE, "..", "..", ".paper-offset");
 export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let offset = -1;
+  // set when a browser message was delivered; the next assistant text
+  // reply gets mirrored to the log as an agent_message, then cleared
+  let replyOwed = false;
+
+  pi.on("message_end", async (event) => {
+    if (event.message.role !== "assistant" || !replyOwed) return;
+    const parts = Array.isArray(event.message.content)
+      ? event.message.content.filter((p: any) => p.type === "text" && p.text?.trim())
+      : [];
+    if (parts.length === 0) return; // tool-call only, reply still owed
+    const text = parts.map((p: any) => p.text).join("\n\n").trim();
+    replyOwed = false;
+    await appendFile(
+      LOG,
+      JSON.stringify({ ts: new Date().toISOString(), kind: "agent_message", text }) + "\n",
+    ).catch(() => {});
+  });
 
   async function readLines(): Promise<any[]> {
     try {
@@ -42,6 +59,7 @@ export default function (pi: ExtensionAPI) {
       if (e.kind !== "human_message") continue;
       const stamp = e.ts?.slice(11, 19) ?? "";
       const text = `[browser ${stamp}] ${e.text}`;
+      replyOwed = true;
       try {
         pi.sendUserMessage(text, { deliverAs: "steer" });
       } catch {
