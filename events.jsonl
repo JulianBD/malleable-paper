@@ -327,3 +327,50 @@
 {"ts":"2026-09-20T20:43:14.222Z","actor":"paper","kind":"node","id":"n_1789932319113_rhip","label":"probe scaffold 3","node_kind":"object","geom":{"x":40,"y":850,"w":150,"h":48}}
 {"ts":"2026-09-20T20:43:23.543Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
 {"ts":"2026-09-20T20:43:26.304Z","actor":"julian","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card","label":""}
+{"ts":"2026-09-20T20:45:39.400Z","actor":"julian","kind":"node","id":"n_1789937139253_xo9h","label":"a doomed node 39216","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:45:42.162Z","actor":"julian","kind":"edge","id":"n_1789937139253_xo9h>n-card:is doomed with","from":"n_1789937139253_xo9h","to":"n-card","label":"is doomed with"}
+{"ts":"2026-09-20T20:45:44.925Z","actor":"julian","kind":"node","id":"n_1789937139253_xo9h","label":"a doomed node 39216","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:46:40.688Z","actor":"julian","kind":"node","id":"n_1789937200653_v5fj","label":"a doomed node 604","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:46:43.452Z","actor":"julian","kind":"edge","id":"n_1789937200653_v5fj>n-card:is doomed with","from":"n_1789937200653_v5fj","to":"n-card","label":"is doomed with"}
+{"ts":"2026-09-20T20:46:46.213Z","actor":"julian","kind":"node","id":"n_1789937200653_v5fj","label":"a doomed node 604","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:47:36.693Z","actor":"julian","kind":"node","id":"n_1789937256615_5dc4","label":"a doomed node 56538","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:47:39.456Z","actor":"julian","kind":"edge","id":"n_1789937256615_5dc4>n-card:is doomed with","from":"n_1789937256615_5dc4","to":"n-card","label":"is doomed with"}
+{"ts":"2026-09-20T20:47:42.218Z","actor":"julian","kind":"node","id":"n_1789937256615_5dc4","label":"a doomed node 56538","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:47:44.980Z","actor":"julian","kind":"node","id":"n-card","label":"card","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n-domain>n-card","from":"n-domain","to":"n-card","label":"wants a ruling via","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card","label":"","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n_1789932319113_rhip>n-card","from":"n_1789932319113_rhip","to":"n-card","label":"","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n_1789937139253_xo9h>n-card:is doomed with","from":"n_1789937139253_xo9h","to":"n-card","label":"is doomed with","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n_1789937200653_v5fj>n-card:is doomed with","from":"n_1789937200653_v5fj","to":"n-card","label":"is doomed with","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"paper","kind":"edge","id":"n_1789937256615_5dc4>n-card:is doomed with","from":"n_1789937256615_5dc4","to":"n-card","label":"is doomed with","superseded":true}
+{"ts":"2026-09-20T20:48:11.852Z","actor":"julian","kind":"node","id":"n_1789937291755_crqa","label":"a doomed node 91693","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:49:22.693Z","actor":"paper","kind":"node","id":"n-card","label":"card","node_kind":"object"}
+{"ts":"2026-09-20T20:49:22.693Z","actor":"paper","kind":"edge","id":"n-domain>n-card","from":"n-domain","to":"n-card","label":"wants a ruling via"}
+{"ts":"2026-09-20T20:49:22.693Z","actor":"paper","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card"}
+{"ts":"2026-09-20T20:49:58.610Z","actor":"julian","kind":"box_geometry","name":"n_1789937291755_crqa","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:49:58.610Z","actor":"julian","kind":"box_geometry","name":"n_1789937291755_crqa","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"paper","kind":"node","id":"n_1789922968387_yte8","label":"probe scaffold 0","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"paper","kind":"node","id":"n_1789923749890_507z","label":"probe scaffold 1","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"paper","kind":"node","id":"n_1789932264908_5lch","label":"probe scaffold 2","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"paper","kind":"node","id":"n_1789932319113_rhip","label":"probe scaffold 3","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"paper","kind":"node","id":"n_1789937291755_crqa","label":"a doomed node 91693","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"julian","kind":"box_geometry","name":"n_1789937291755_crqa","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:51:04.921Z","actor":"julian","kind":"box_geometry","name":"n_1789937291755_crqa","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:51:55.912Z","actor":"julian","kind":"node","id":"n_1789937515873_c19m","label":"a doomed node 13189","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:51:58.675Z","actor":"julian","kind":"edge","id":"n_1789937515873_c19m>n-card:is doomed with","from":"n_1789937515873_c19m","to":"n-card","label":"is doomed with"}
+{"ts":"2026-09-20T20:52:01.437Z","actor":"julian","kind":"node","id":"n_1789937515873_c19m","label":"a doomed node 13189","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:52:38.880Z","actor":"paper","kind":"edge","id":"n_1789937515873_c19m>n-card:is doomed with","from":"n_1789937515873_c19m","to":"n-card","label":"is doomed with","superseded":true}
+{"ts":"2026-09-20T20:52:41.644Z","actor":"julian","kind":"node","id":"n_1789937561511_m4g3","label":"a doomed node 58819","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:52:44.407Z","actor":"julian","kind":"edge","id":"n-card>n_1789937561511_m4g3:is doomed by","from":"n-card","to":"n_1789937561511_m4g3","label":"is doomed by"}
+{"ts":"2026-09-20T20:52:47.173Z","actor":"julian","kind":"node","id":"n_1789937561511_m4g3","label":"a doomed node 58819","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:54:25.622Z","actor":"paper","kind":"edge","id":"n-card>n_1789937561511_m4g3:is doomed by","from":"n-card","to":"n_1789937561511_m4g3","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T20:54:28.133Z","actor":"julian","kind":"node","id":"n_1789937668111_lyni","label":"a doomed node 65419","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:54:30.897Z","actor":"julian","kind":"edge","id":"n-card>n_1789937668111_lyni:is doomed by","from":"n-card","to":"n_1789937668111_lyni","label":"is doomed by"}
+{"ts":"2026-09-20T20:54:33.658Z","actor":"julian","kind":"node","id":"n_1789937668111_lyni","label":"a doomed node 65419","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T20:54:36.671Z","actor":"julian","kind":"edge","id":"n-card>n_1789937668111_lyni:is doomed by","from":"n-card","to":"n_1789937668111_lyni","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T20:54:55.507Z","actor":"julian","kind":"node","id":"n_1789937695361_nflp","label":"a probe node 95316","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T20:54:58.271Z","actor":"julian","kind":"node","id":"n_1789937695361_nflp","label":"a renamed probe 95316","node_kind":"object"}
+{"ts":"2026-09-20T20:55:05.553Z","actor":"julian","kind":"edge","id":"n-engine>n-domain:never interprets (probe 16:55:01)","from":"n-engine","to":"n-domain","label":"never interprets (probe 16:55:01)"}
+{"ts":"2026-09-20T20:55:12.583Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T20:55:15.347Z","actor":"julian","kind":"edge","id":"n_1789937695361_nflp>n-card","from":"n_1789937695361_nflp","to":"n-card","label":""}
+{"ts":"2026-09-20T20:55:25.399Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":223,"w":200,"h":140}}

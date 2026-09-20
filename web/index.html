@@ -73,7 +73,9 @@
       const n = new Map();
       for (const e of latest) if (e.kind === 'node' && e.id) n.set(e.id, e);
       boxes.length = 0;
+      // superseded re-emits fold to absent (identity survives; presence doesn't)
       for (const e of n.values()) {
+        if (e.superseded) continue;
         const g = e.geom ?? { x: 40, y: 40, w: 180, h: 56 };
         boxes.push({ name: e.id, label: e.label, kind: e.node_kind, x: g.x, y: g.y, w: g.w, h: g.h });
       }
@@ -81,11 +83,15 @@
     function foldEdges() {
       const m = new Map();
       for (const e of latest) if (e.kind === 'edge' && e.id) m.set(e.id, e);
-      edges = [...m.values()];
+      edges = [...m.values()].filter((e) => !e.superseded);
     }
 
     function render() {
       if (!playground) return; // geometry frame not mounted
+      // removal is reprojection too: a superseded node folds out of `boxes`,
+      // and its element must leave the DOM (found by supersedeprobe)
+      for (const el of playground.querySelectorAll('.box'))
+        if (+el.dataset.i >= boxes.length) el.remove();
       boxes.forEach((b, i) => {
         let el = document.getElementById('box' + i);
         if (!el) {
@@ -107,6 +113,7 @@
         // reproject EVERY render — a rename must reach an existing element's
         // label, not just a freshly created one (found by makeprobe)
         el.querySelector('.label').textContent = b.label ?? b.name ?? '';
+        el.classList.toggle('sel', sketch && selected?.type === 'node' && selected.id === b.name);
         el.style.left = b.x + 'px';
         el.style.top = b.y + 'px';
         el.style.width = b.w + 'px';
@@ -117,6 +124,12 @@
 
     // the edge layer: SVG over the playground, lines between node centers.
     // Pure projection — it only reads `boxes` and `edges`, never writes.
+    // selection is ephemeral presentation state — never an act until it
+    // terminates in one (the differentiability test: a selection you act on
+    // is a gesture; a selection you stare at stays free)
+    let selected = null; // { type: 'node'|'edge', id }
+    let checkPanel = null; // { ev, el } — evidence for a check mark, ephemeral
+
     function renderEdges() {
       if (!playground) return;
       let svg = document.getElementById('edgelay');
@@ -127,21 +140,76 @@
       }
       svg.setAttribute('width', playground.clientWidth);
       svg.setAttribute('height', playground.clientHeight);
+      // ambiguity check: same source + same verb twice — the 'is' reading breaks
+      const byVerb = new Map();
+      for (const e of edges) {
+        if (!e.label) continue;
+        const k = e.from + '\u0000' + e.label;
+        byVerb.set(k, (byVerb.get(k) ?? 0) + 1);
+      }
       let html = '';
       for (const e of edges) {
         const a = boxes.find((b) => b.name === e.from), c = boxes.find((b) => b.name === e.to);
-        if (!a || !c) continue;
+        const isSel = selected?.type === 'edge' && selected.id === e.id;
+        if (!a && !c) continue; // both endpoints gone: nothing to draw from
+        if (!a || !c) { // dangling — dashed stub from the box EDGE outward
+          // (a center-out stub hides under the box itself: half-width ≥ 70)
+          const s = a ?? c, miss = a ? e.to : e.from;
+          const y1 = s.y + s.h / 2;
+          const x1 = a ? s.x + s.w + 10 : s.x - 10; // just outside the box
+          const dx = a ? 50 : -50;
+          const bx = x1 + dx + (a ? 12 : -12);
+          html += `<line class="dang" x1="${x1}" y1="${y1}" x2="${x1 + dx}" y2="${y1}"/>`;
+          html += `<line class="hit dangsel" data-ev="${esc(e.id)}" x1="${x1}" y1="${y1}" x2="${x1 + dx}" y2="${y1}"/>`;
+          html += `<g class="badge" data-ev="${esc(e.id)}"><circle cx="${bx}" cy="${y1}" r="9"/><text x="${bx}" y="${y1 + 4}" text-anchor="middle">⊘</text></g>`;
+          html += `<text class="dangtxt" x="${x1 + dx / 2}" y="${y1 - 6}" text-anchor="middle">${esc(miss)} is gone</text>`;
+          continue;
+        }
         const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2, x2 = c.x + c.w / 2, y2 = c.y + c.h / 2;
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+        const cls = isSel ? ' class="sel"' : '';
+        // wide transparent hit-line makes edges clickable for selection
+        html += `<line class="hit" data-ev="${esc(e.id)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+        html += `<line${cls} x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
         if (e.label)
           html += `<text x="${mx}" y="${my - 4}" text-anchor="middle">${esc(e.label)}</text>`;
+        else // bare arrow: legal, marked with a small dot
+          html += `<circle class="mark" cx="${mx}" cy="${my}" r="3"/>`;
+        if (e.label && byVerb.get(e.from + '\u0000' + e.label) > 1)
+          html += `<text class="marktxt" x="${mx}" y="${my + 12}" text-anchor="middle">≈</text>`;
       }
       if (link) { // the rubber band — ephemeral, never logged
         const s = boxes.find((b) => b.name === link.from);
         if (s) html += `<line class="rubber" x1="${s.x + s.w / 2}" y1="${s.y + s.h / 2}" x2="${link.px - playground.getBoundingClientRect().left}" y2="${link.py - playground.getBoundingClientRect().top}"/>`;
       }
       svg.innerHTML = html;
+      // edge selection + check-evidence clicks (svg innerHTML kills listeners,
+      // so delegate at the svg)
+      svg.onclick = (ev) => {
+        const hit = ev.target.closest('.hit, .badge, .dangsel');
+        if (!hit) return;
+        if (hit.classList.contains('badge')) { showCheck(hit.dataset.ev); return; }
+        const e = edges.find((v) => v.id === hit.dataset.ev);
+        if (e) { selected = { type: 'edge', id: e.id }; renderEdges(); render(); }
+      };
+    }
+
+    // check evidence: the history functor as error provenance — click a mark,
+    // read the events that produced the offending structure
+    function showCheck(edgeId) {
+      closeCheck();
+      const evs = latest.filter((v) => (v.kind === 'edge' && v.id === edgeId) || (v.kind === 'node' && (v.id === edgeId)));
+      const el = document.createElement('pre');
+      el.className = 'checkpanel';
+      el.textContent = evs.map((v) => JSON.stringify(v)).join('\n') || 'no events found';
+      playground.append(el);
+      checkPanel = { el };
+      setTimeout(closeCheck, 8000); // ephemeral — it is a look, not a fixture
+    }
+    function closeCheck() {
+      if (!checkPanel) return;
+      checkPanel.el.remove();
+      checkPanel = null;
     }
 
     const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
@@ -500,7 +568,19 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         plane.releasePointerCapture(e.pointerId);
         return;
       }
-      if (!drag) return;
+      if (!drag) { // empty-plane click in sketch mode: drop selection + close evidence
+        if (sketch) { if (selected) { selected = null; render(); renderEdges(); } closeCheck(); }
+        return;
+      }
+      // a click that never moved: select the node (sketch) — selection is
+      // ephemeral; it becomes an act only via supersede (Backspace/Delete)
+      if (sketch && drag.mode === 'move' && Math.abs(e.clientX - drag.px) < 4 && Math.abs(e.clientY - drag.py) < 4) {
+        selected = { type: 'node', id: boxes[drag.i].name };
+        render(); renderEdges();
+        drag = null;
+        plane.releasePointerCapture(e.pointerId);
+        return;
+      }
       // hydration ruling (feature 1): every release is a durable geometry
       // act — the resting position is a domain fact. record brackets keep
       // their meaning for the throttled box_drag motion samples only.
@@ -638,6 +718,20 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
     document.addEventListener('keydown', (e) => {
       if (e.target === t || e.target === verbAsk?.el || e.target === nameAsk?.el) return; // typing in the chat bar or any inline ask
+      if ((e.key === 'Backspace' || e.key === 'Delete') && sketch && selected) {
+        // supersede, never delete: the act re-emits with superseded:true —
+        // presence folds away, identity and history survive
+        e.preventDefault();
+        if (selected.type === 'node') {
+          const b = boxes.find((v) => v.name === selected.id);
+          if (b) logEvent({ kind: 'node', id: b.name, label: b.label, node_kind: b.kind, superseded: true });
+        } else {
+          const ed = edges.find((v) => v.id === selected.id);
+          if (ed) logEvent({ kind: 'edge', id: ed.id, from: ed.from, to: ed.to, label: ed.label, superseded: true });
+        }
+        selected = null;
+        return;
+      }
       if (e.key === 'ArrowLeft') switchFrame(frame - 1);
       if (e.key === 'ArrowRight') switchFrame(frame + 1);
     });

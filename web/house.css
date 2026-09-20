@@ -381,3 +381,22 @@ form .status {
   border-radius: 0;
   outline: none;
 }
+
+/* selection & checks — all ephemeral presentation, never events */
+.box.sel { border: 2px solid #000; background: #f5f5f5; }
+#edgelay line.hit { stroke: transparent; stroke-width: 9; pointer-events: stroke; cursor: pointer; }
+#edgelay line.sel { stroke-width: 2.5; }
+#edgelay line.dang { stroke: #000; stroke-dasharray: 3 4; opacity: 0.5; }
+/* .dangsel rides the .hit overlay: a 1px dashed stroke is a 1px target */
+#edgelay text.dangtxt { font: 9px sans-serif; fill: #000; opacity: 0.6; }
+#edgelay circle.mark { fill: #000; }
+#edgelay text.marktxt { font: 10px sans-serif; fill: #000; }
+#edgelay g.badge { pointer-events: all; cursor: pointer; }
+#edgelay g.badge circle { fill: #fff; stroke: #000; }
+#edgelay g.badge text { font: 9px sans-serif; }
+.checkpanel {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  margin: 0; border: 1px solid #000; background: #fff; padding: 6px 8px;
+  font: 10px/1.4 monospace; max-width: 70%; max-height: 40%; overflow: auto;
+  white-space: pre-wrap; word-break: break-all; z-index: 5;
+}
