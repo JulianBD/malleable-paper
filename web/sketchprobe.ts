@@ -45,7 +45,8 @@ console.log("moved:", moved && { x: moved.x, y: moved.y });
 const byLabel = (txt) => page.locator('#playground .box', { has: page.locator('.label', { hasText: new RegExp('^' + txt + '$') }) }).first();
 
 // label-drag a link between two NON-overlapping nodes: log → card
-// (prompt auto-dismisses headless → bare arrow)
+// (drop opens the inline verb ask; Escape commits the bare arrow — the
+// prompt used to auto-dismiss headless, which meant the same thing)
 const fold = byLabel('the event log');
 const hist = byLabel('card');
 const fb = await fold.boundingBox(), hb = await hist.boundingBox();
@@ -55,6 +56,14 @@ if (fb && hb) {
   await page.mouse.down();
   await page.mouse.move(hb.x + hb.width - 12, hb.y + hb.height / 2, { steps: 8 }); // body edge, avoids the target's own pill
   await page.mouse.up();
+  // the drop must open the inline ask — Escape dismisses it, committing
+  // the bare arrow. If the ask never opens, the gesture regressed: fail.
+  var dismissed = false;
+  try {
+    await page.locator("#playground .verbin").waitFor({ state: "visible", timeout: 3000 });
+    await page.keyboard.press("Escape");
+    dismissed = true;
+  } catch {}
   await page.waitForTimeout(2600);
   lines = await page.locator("#edgelay line:not(.rubber)").count();
   console.log("edge lines after link gesture:", lines);
@@ -78,7 +87,7 @@ await page.screenshot({ path: `${OUT}/olog-3-reloaded.png` });
 console.log("reloaded — nodes:", boxes2, "lines:", lines2, "domain at:", dom2 && { x: dom2.x, y: dom2.y });
 
 const ok =
-  boxCount === 11 && lineCount >= 7 && linked &&
+  boxCount === 11 && lineCount >= 7 && linked && dismissed &&
   moved && dom2 && Math.abs(moved.y - dom2.y) < 2 &&
   boxes2 === 11 && lines2 === lines;
 // the decisive check: the edge act is IN THE LOG with the right endpoints

@@ -40,6 +40,7 @@
     let latest = []; // the folded event log — declared up top: foldGeometry runs at first frame build
     let edges = []; // folded paper.edge events (latest per id)
     let link = null; // rubber-band gesture: { from, px, py }
+    let verbAsk = null; // dropped arrow awaiting its verb: { from, to, el }
     const boxes = [
       { name: 'A', x: 40, y: 40, w: 200, h: 140 },
       { name: 'B', x: 0, y: 40, w: 200, h: 140 },
@@ -387,15 +388,46 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       }
     });
 
+    // ——— the verb ask: the dropped arrow's phrase, asked inline ———
+    // Drop opens a small input at the arrow's midpoint — no modal prompt.
+    // Enter commits the edge act (value = label, empty = bare arrow),
+    // Escape commits the bare arrow, blur/click-away abandons the edge
+    // entirely: no act, no line.
+    function askVerb(from, to) {
+      closeVerb(null); // one ask at a time — a new drop supersedes the old
+      const a = boxes.find((b) => b.name === from), c = boxes.find((b) => b.name === to);
+      if (!a || !c || !playground) return;
+      const mx = (a.x + a.w / 2 + c.x + c.w / 2) / 2, my = (a.y + a.h / 2 + c.y + c.h / 2) / 2;
+      const el = document.createElement('input');
+      el.className = 'verbin';
+      el.placeholder = 'verb phrase?';
+      el.style.left = mx + 'px';
+      el.style.top = my + 'px';
+      playground.append(el);
+      el.focus();
+      verbAsk = { from, to, el };
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') closeVerb(el.value);
+        else if (ev.key === 'Escape') closeVerb('');
+      });
+      el.addEventListener('blur', () => closeVerb(null));
+    }
+    // commit !== null commits the edge (label '' = bare arrow); null abandons
+    function closeVerb(commit) {
+      if (!verbAsk) return;
+      const { from, to, el } = verbAsk;
+      verbAsk = null; // cleared first: el.remove() blurs, and the blur must find nothing left to abandon
+      el.remove();
+      if (commit !== null)
+        logEvent({ kind: 'edge', id: from + '>' + to + (commit ? ':' + commit : ''), from, to, label: commit });
+    }
+
     plane.addEventListener('pointerup', (e) => {
-      if (link) { // drop on a box commits the edge act; drop in space abandons
+      if (link) { // drop on a box opens the verb ask; drop in space abandons
         const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.box');
         const ti = target ? +target.dataset.i : -1;
         const to = boxes[ti] && boxes[ti].name !== link.from ? boxes[ti].name : null;
-        if (to) {
-          const label = prompt('verb phrase for this arrow? (ok = bare arrow)', '') ?? '';
-          logEvent({ kind: 'edge', id: link.from + '>' + to + (label ? ':' + label : ''), from: link.from, to, label });
-        }
+        if (to) askVerb(link.from, to);
         link = null;
         renderEdges();
         plane.releasePointerCapture(e.pointerId);
@@ -545,7 +577,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     document.getElementById('fprev').addEventListener('click', () => switchFrame(frame - 1));
     document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
     document.addEventListener('keydown', (e) => {
-      if (e.target === t) return; // typing in the chat bar
+      if (e.target === t || e.target === verbAsk?.el) return; // typing in the chat bar or the verb ask
       if (e.key === 'ArrowLeft') switchFrame(frame - 1);
       if (e.key === 'ArrowRight') switchFrame(frame + 1);
     });
