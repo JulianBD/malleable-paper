@@ -304,7 +304,7 @@ form .status {
 }
 
 /* cards: adjudication requests on the plane */
-#cardfield { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+#cardfield { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; min-height: 0; }
 .card { border: 1px solid #000; background: #fff; padding: 12px 14px; max-width: 720px; }
 .card.ruled { opacity: .45; }
 .card-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
@@ -334,7 +334,7 @@ form .status {
 .card-form { flex-direction: column; align-items: stretch; }
 
 /* system frame: the system explaining itself */
-.sys { padding: 24px; max-width: 860px; overflow-y: auto; font-size: 14px; }
+.sys { padding: 24px; max-width: 860px; overflow-y: auto; font-size: 14px; min-height: 0; }
 .sys h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px; }
 .sys h2:first-child { margin-top: 0; }
 .sys p { max-width: 72ch; line-height: 1.45; }
