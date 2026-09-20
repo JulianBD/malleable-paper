@@ -1,3 +1,10 @@
 lexicon registry: agent_message, box_drag, box_geometry, card, card_response, eval, frame_def, frame_switch, human_message, record_start, record_stop, thread
 malleable-paper listening on http://localhost:5174
 event log: /Users/juliandorsey/Code/malleable-paper/events.jsonl · drain every 250ms
+boot queued (position 1) — web/boot.scm
+boot queued (position 1) — web/boot.scm
+eval failed (boot): eval failed: Unbound variable `frobnicate' — also in /queue
+boot queued (position 1) — web/boot.scm
+boot queued (position 1) — web/boot.scm
+boot queued (position 1) — web/boot.scm
+boot queued (position 1) — web/boot.scm

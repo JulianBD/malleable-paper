@@ -77,6 +77,26 @@ function enqueue(act) {
   return queue.length; // position hint, not a cursor
 }
 
+// ——— boot: web/boot.scm through the queue ———
+// The boot program is not special-cased: runBoot() reads it fresh from
+// disk and enqueues it as an eval act, so its products take the same
+// validate-and-append path as any drain batch (failures land in /queue,
+// logged, server lives). frame_def folds latest-per-id → re-boots
+// refresh the F-boot frame, never duplicate it. Reading the file per
+// call means editing boot.scm + GET /boot takes effect without a restart.
+const BOOT = join(root, "boot.scm");
+async function runBoot() {
+  try {
+    const program = await readFile(BOOT, "utf8");
+    const position = enqueue({ kind: "eval", program, actor: "boot" });
+    console.log(`boot queued (position ${position}) — web/boot.scm`);
+    return { ok: true, position };
+  } catch (e) {
+    console.warn(`boot failed: ${e.message}`);
+    return { ok: false, why: e.message };
+  }
+}
+
 async function drain() {
   if (!queue.length) return;
   const batch = queue;
@@ -91,6 +111,7 @@ async function drain() {
         const products = await evaluate(String(act.program ?? ""), String(act.actor ?? "agent"), await readEvents());
         expanded.push({ ...act, emitted: products.map((p) => p.kind) }, ...products);
       } catch (e) {
+        console.warn(`eval failed (${act.actor ?? "?"}): ${e.message} — also in /queue`);
         rejects.push({ act, why: `eval failed: ${e.message}`, ts: new Date().toISOString() });
       }
     } else {
@@ -139,6 +160,11 @@ const server = Bun.serve({
       return Response.json(lexicons);
     }
 
+    // re-run the boot program on demand (boot.scm is re-read)
+    if (req.method === "GET" && url.pathname === "/boot") {
+      return Response.json(await runBoot());
+    }
+
     // canonical intake
     if (req.method === "POST" && url.pathname === "/act") {
       let body;
@@ -185,3 +211,5 @@ const server = Bun.serve({
 
 console.log(`malleable-paper listening on http://localhost:${server.port}`);
 console.log(`event log: ${LOG} · drain every ${DRAIN_MS}ms`);
+
+await runBoot(); // the runtime starts here — boot.scm → queue → drain
