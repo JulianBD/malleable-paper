@@ -30,7 +30,7 @@ await page.waitForTimeout(300);
 await shot("02-meta-open");
 
 // drag A across the playground toward B (contact), then away (escape)
-const a = await page.locator("#box0").boundingBox();
+const a = await page.locator("#box0").boundingBox(); // fresh, post-layout
 const b = await page.locator("#box1").boundingBox();
 if (a && b) {
   const cy = a.y + a.height / 2;
