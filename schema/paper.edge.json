@@ -1,0 +1,45 @@
+{
+  "lexicon": 1,
+  "id": "paper.edge",
+  "status": "draft",
+  "node": "the line between two .box elements in the sketch frame",
+
+  "events": {
+    "emits": {
+      "edge": {
+        "type": "object",
+        "required": ["ts", "kind", "actor", "id", "from", "to"],
+        "properties": {
+          "ts":    {"type": "string", "format": "datetime"},
+          "kind":  {"const": "edge"},
+          "actor": {"type": "string"},
+          "id":    {"type": "string", "comment": "fold key — latest edge per id wins. Convention: '<from>><to>:<label>' so a relabel re-emits in place and parallel arrows stay distinct"},
+          "from":  {"type": "string", "comment": "node id"},
+          "to":    {"type": "string", "comment": "node id"},
+          "label": {"type": "string", "comment": "the verb-phrase (olog reading: 'renders as', 'is folded from') — optional; a bare arrow is legal"}
+        },
+        "comment": "the link-gesture act: drag from a node's label, drop on another node. Sketch first content: the floor olog's arrows."
+      }
+    },
+    "consumes": ["edge"]
+  },
+
+  "domain": {
+    "fold": "latest edge per id",
+    "states": {"absent": {"on": {"edge[id]": "present"}}, "present": {"on": {"edge[id=self]": "present — relabel/redirect in place"}}},
+    "derives": {
+      "composition": "UNDESIGNED: if from-type composes with to-type, a derived edge exists — the category question. When a user earns it, the composition law is declared HERE, in edge lexicons, not in code"
+    },
+    "acts": {
+      "link": {"event": "edge", "guard": "from and to are present node ids", "via": "label-drag gesture → POST /act"}
+    }
+  },
+
+  "system": {"tick": "shared 2s poll; edge layer redraws on render()"},
+
+  "render": {
+    "element": "#edgelay (SVG overlay in the playground, pointer-events: none)",
+    "template": "line between node centers, verb-phrase label at midpoint; rubber-band line while the gesture is in flight",
+    "ephemeral": ["the rubber band", "mid-flight hover target"]
+  }
+}

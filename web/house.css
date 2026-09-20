@@ -347,3 +347,22 @@ form .status {
 /* sysframe wraps .sys — it must be bounded too, or .sys never scrolls */
 #sysframe { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #sysframe .sys { flex: 1; }
+
+/* the edge layer (olog sketch frame): pure projection over the playground */
+#edgelay { position: absolute; inset: 0; pointer-events: none; }
+#edgelay line { stroke: #000; stroke-width: 1; }
+#edgelay text { font: 10px/1.2 sans-serif; fill: #000; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+#edgelay .rubber { stroke-dasharray: 4 3; opacity: 0.55; }
+
+/* sketch frame: the label is a small pill, not the whole box —
+   grab a node BY ITS NAME to draw an edge; grab its body to move it */
+#playground.sketchplay .box .label {
+  inset: auto;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  background: #fff;
+  border: 1px dashed #000;
+  cursor: crosshair;
+  pointer-events: auto; /* the pill is a real target here — by-name grab = link */
+}

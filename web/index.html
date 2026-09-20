@@ -35,8 +35,11 @@
     // type declares which quadrant is solid. A bound applies only if you
     // approach it (direction guard), and axes resolve dominant-first.
     const plane = document.getElementById('plane');
-    let playground = null; // set when the geometry frame is built
+    let playground = null; // set when a playground frame is built
+    let sketch = false; // sketch frame: nodes/edges render, boxes don't collide
     let latest = []; // the folded event log — declared up top: foldGeometry runs at first frame build
+    let edges = []; // folded paper.edge events (latest per id)
+    let link = null; // rubber-band gesture: { from, px, py }
     const boxes = [
       { name: 'A', x: 40, y: 40, w: 200, h: 140 },
       { name: 'B', x: 0, y: 40, w: 200, h: 140 },
@@ -48,8 +51,8 @@
     // No stored state (ruling 6): positions are derived from the log every
     // time the frame builds. box_drag samples throttle at 80ms and every
     // release follows with box_geometry, so last-event-per-name lands on
-    // the release act. Unknown names are ignored — node creation (feature
-    // 3) will earn their handling.
+    // the release act. Unknown names are ignored — geometry applies to
+    // whichever boxes the current frame provides (A/B, or folded nodes).
     function foldGeometry() {
       const g = new Map();
       for (const e of latest)
@@ -59,6 +62,25 @@
         const v = g.get(b.name);
         if (v) Object.assign(b, { x: v.x, y: v.y, w: v.w, h: v.h });
       }
+    }
+
+    // ——— the graph's first real fold: nodes and edges ———
+    // Latest node per id → a box; latest edge per id → the edge layer.
+    // Node geometry is owned by box_geometry acts (name = node id), so a
+    // dragged node is just a box whose name is an id — one gesture machine.
+    function foldNodes() {
+      const n = new Map();
+      for (const e of latest) if (e.kind === 'node' && e.id) n.set(e.id, e);
+      boxes.length = 0;
+      for (const e of n.values()) {
+        const g = e.geom ?? { x: 40, y: 40, w: 180, h: 56 };
+        boxes.push({ name: e.id, label: e.label, kind: e.node_kind, x: g.x, y: g.y, w: g.w, h: g.h });
+      }
+    }
+    function foldEdges() {
+      const m = new Map();
+      for (const e of latest) if (e.kind === 'edge' && e.id) m.set(e.id, e);
+      edges = [...m.values()];
     }
 
     function render() {
@@ -72,7 +94,7 @@
           el.dataset.i = i;
           const label = document.createElement('span');
           label.className = 'label';
-          label.textContent = b.name ?? '';
+          label.textContent = b.label ?? b.name ?? '';
           el.append(label);
           for (const c of ['nw', 'ne', 'sw', 'se']) {
             const h = document.createElement('div');
@@ -87,6 +109,36 @@
         el.style.width = b.w + 'px';
         el.style.height = b.h + 'px';
       });
+      renderEdges();
+    }
+
+    // the edge layer: SVG over the playground, lines between node centers.
+    // Pure projection — it only reads `boxes` and `edges`, never writes.
+    function renderEdges() {
+      if (!playground) return;
+      let svg = document.getElementById('edgelay');
+      if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'edgelay';
+        playground.prepend(svg);
+      }
+      svg.setAttribute('width', playground.clientWidth);
+      svg.setAttribute('height', playground.clientHeight);
+      let html = '';
+      for (const e of edges) {
+        const a = boxes.find((b) => b.name === e.from), c = boxes.find((b) => b.name === e.to);
+        if (!a || !c) continue;
+        const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2, x2 = c.x + c.w / 2, y2 = c.y + c.h / 2;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+        if (e.label)
+          html += `<text x="${mx}" y="${my - 4}" text-anchor="middle">${esc(e.label)}</text>`;
+      }
+      if (link) { // the rubber band — ephemeral, never logged
+        const s = boxes.find((b) => b.name === link.from);
+        if (s) html += `<line class="rubber" x1="${s.x + s.w / 2}" y1="${s.y + s.h / 2}" x2="${link.px - playground.getBoundingClientRect().left}" y2="${link.py - playground.getBoundingClientRect().top}"/>`;
+      }
+      svg.innerHTML = html;
     }
 
     const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
@@ -94,7 +146,7 @@
 
     function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
       const pw = drag.cont.clientWidth, ph = drag.cont.clientHeight;
-      const others = boxes.filter((o) => o !== drag.target);
+      const others = sketch ? [] : boxes.filter((o) => o !== drag.target); // sketch: nodes float free, no corner contract
       // resolve the DOMINANT axis first, so the second axis's overlap test
       // sees the updated position — diagonal escapes aren't pinned by a
       // stale start-span overlap
@@ -271,6 +323,14 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       const boxEl = e.target.closest('.box');
       if (!boxEl) return;
       const i = +boxEl.dataset.i;
+      // link gesture (sketch frame): grab a node's LABEL to draw an edge —
+      // body drag moves it, label drag relates it. Tactile split, no modifier.
+      if (sketch && e.target.closest('.label') && boxes[i]) {
+        link = { from: boxes[i].name, px: e.clientX, py: e.clientY };
+        plane.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
       const handle = e.target.closest('.handle');
       drag = handle
         ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i], cont: playground }
@@ -308,6 +368,11 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
 
     let lastSample = 0;
     plane.addEventListener('pointermove', (e) => {
+      if (link) { // rubber band follows the pointer — projection only
+        link.px = e.clientX; link.py = e.clientY;
+        renderEdges();
+        return;
+      }
       if (!drag) return;
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
       const g = drag.mode === 'move'
@@ -323,6 +388,19 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
     });
 
     plane.addEventListener('pointerup', (e) => {
+      if (link) { // drop on a box commits the edge act; drop in space abandons
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.box');
+        const ti = target ? +target.dataset.i : -1;
+        const to = boxes[ti] && boxes[ti].name !== link.from ? boxes[ti].name : null;
+        if (to) {
+          const label = prompt('verb phrase for this arrow? (ok = bare arrow)', '') ?? '';
+          logEvent({ kind: 'edge', id: link.from + '>' + to + (label ? ':' + label : ''), from: link.from, to, label });
+        }
+        link = null;
+        renderEdges();
+        plane.releasePointerCapture(e.pointerId);
+        return;
+      }
       if (swipe) {
         const dx = e.clientX - swipe.px;
         if (Math.abs(dx) > 40) swipe.el._show(swipe.page + (dx < 0 ? 1 : -1));
@@ -373,8 +451,11 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
             '<section id="left"><section id="playground"></section><article class="box doc" id="doc"></article></section>' +
             '<section id="right"><article class="box doc reader" id="contract"></article></section>';
           playground = document.getElementById('playground');
+          sketch = false;
           makeDoc(document.getElementById('doc'), PAGES);
           makeDoc(document.getElementById('contract'), [CONTRACT], false);
+          boxes.length = 0; // fresh A/B — the corner-contract demo pair
+          boxes.push({ name: 'A', x: 40, y: 40, w: 200, h: 140 }, { name: 'B', x: 0, y: 40, w: 200, h: 140 });
           boxes[1].x = playground.clientWidth - boxes[1].w - 40; // fresh-log default
           foldGeometry(); // hydration (F): the log is the only geometry memory
           render();
@@ -386,7 +467,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           document.getElementById('frames').innerHTML =
             '<section id="left" class="col"><article class="box doc reader" id="fw"></article></section>';
           makeDoc(document.getElementById('fw'), [LANDSCAPE], false);
-          playground = null;
+          playground = null; sketch = false;
         },
       },
       {
@@ -394,7 +475,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         build() {
           document.getElementById('frames').innerHTML =
             '<section id="left" class="col"><div id="cardfield"></div></section>';
-          playground = null;
+          playground = null; sketch = false;
           renderCards();
         },
       },
@@ -403,8 +484,25 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         build() {
           document.getElementById('frames').innerHTML =
             '<section id="left" class="col"><div id="sysframe"></div></section>';
-          playground = null;
+          playground = null; sketch = false;
           renderSys();
+        },
+      },
+      {
+        title: 'olog · the floor, sketched',
+        build() {
+          // the design artifact: the runtime's own vocabulary as manipulable
+          // nodes and edges. Every box is a folded `node` event, every line a
+          // folded `edge` event — drawing IS the graph's seed corpus.
+          document.getElementById('frames').innerHTML =
+            '<section id="left"><section id="playground"></section></section>';
+          playground = document.getElementById('playground');
+          playground.classList.add('sketchplay');
+          sketch = true;
+          foldNodes();
+          foldEdges();
+          foldGeometry(); // dragged-node positions, name = node id
+          render();
         },
       },
     ];
@@ -422,7 +520,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         build() {
           document.getElementById('frames').innerHTML =
             '<section id="left" class="col"><div id="sysframe"><div class="sys dynframe">' + md(d.body) + '</div></div></section>';
-          playground = null;
+          playground = null; sketch = false;
         },
       })));
     }
@@ -675,12 +773,19 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         cursor = r.cursor;
         if (fresh.length) {
           latest = latest.concat(fresh);
-          // hydration live-half: new geometry acts re-fold into the plane
-          // (skip mid-drag — the gesture owns the box until release)
-          if (frame === 0 && playground && !drag &&
-              fresh.some((e) => e.kind === 'box_geometry' || e.kind === 'box_drag')) {
-            foldGeometry();
-            render();
+          // hydration live-half + graph live-half: new acts re-fold into the
+          // active plane (skip mid-gesture — the gesture owns the box until
+          // release; the rubber band owns the edge layer until drop)
+          if (playground && !drag && !link) {
+            if (sketch && fresh.some((e) => e.kind === 'node' || e.kind === 'edge')) {
+              foldNodes();
+              foldEdges();
+              foldGeometry();
+              render();
+            } else if (fresh.some((e) => e.kind === 'box_geometry' || e.kind === 'box_drag')) {
+              foldGeometry();
+              render();
+            }
           }
           renderCards();
           renderSys();

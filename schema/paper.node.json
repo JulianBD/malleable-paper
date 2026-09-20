@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "paper.node",
+  "status": "draft",
+  "node": ".box in the sketch frame (first real user: the floor-olog sketch)",
+
+  "events": {
+    "emits": {
+      "node": {
+        "type": "object",
+        "required": ["ts", "kind", "actor", "id", "label"],
+        "properties": {
+          "ts":        {"type": "string", "format": "datetime"},
+          "kind":      {"const": "node"},
+          "actor":     {"type": "string"},
+          "id":        {"type": "string", "comment": "fold key — latest node per id wins; stable identity across relabels"},
+          "label":     {"type": "string", "comment": "the noun-phrase (olog reading: 'a box', 'the event log')"},
+          "node_kind": {"type": "string", "comment": "optional typing: machine / event-kind / functor / object — lexicons type payloads; the graph store is kind-agnostic"},
+          "geom":      {
+            "type": "object", "required": ["x", "y", "w", "h"],
+            "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "w": {"type": "number", "minimum": 20}, "h": {"type": "number", "minimum": 20}},
+            "comment": "seed layout; afterwards geometry is owned by box_geometry acts (same fold, name = node id)"
+          }
+        },
+        "comment": "creation/relabel act. First instance: the floor-olog sketch — the runtime's own vocabulary, drawn in the runtime."
+      }
+    },
+    "consumes": ["node"]
+  },
+
+  "domain": {
+    "fold": "latest node per id",
+    "states": {"absent": {"on": {"node[id]": "present"}}, "present": {"on": {"node[id=self]": "present — relabel/retype in place"}}},
+    "acts": {
+      "create": {"event": "node", "via": "POST /act (agent seeds; a plane-side 'new box' gesture is feature 3, unbuilt)"},
+      "relabel": {"event": "node", "via": "POST /act"}
+    }
+  },
+
+  "system": {"tick": "shared 2s poll (sketch frame folds node + edge + box_geometry)", "ingest": "server drain validates against this registry entry"},
+
+  "render": {
+    "element": ".box[data-name] in the sketch frame",
+    "template": "same box as geometry frame; label shows the noun-phrase; corner handles resize; label-drag is the link gesture (paper.edge)",
+    "ephemeral": ["in-gesture geometry", "rubber-band line while drawing an edge"]
+  },
+
+  "comment": "design-by-use provenance: fields earned by the sketch feature, not imagined. node_kind is deliberately untyped-here — when composition laws arrive (category ruling), edge lexicons carry them, node lexicons stay kind-agnostic."
+}
