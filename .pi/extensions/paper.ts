@@ -19,9 +19,10 @@ const OFFSET = join(HERE, "..", "..", ".paper-offset");
 export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let offset = -1;
-  // set when a browser message was delivered; the next assistant text
-  // reply gets mirrored to the log as an agent_message, then cleared
+  // set when a browser message was delivered; the turn's last assistant
+  // text is mirrored to the log as an agent_message once the agent settles
   let replyOwed = false;
+  let lastReplyText: string | null = null;
 
   pi.on("message_end", async (event) => {
     if (event.message.role !== "assistant" || !replyOwed) return;
@@ -29,8 +30,15 @@ export default function (pi: ExtensionAPI) {
       ? event.message.content.filter((p: any) => p.type === "text" && p.text?.trim())
       : [];
     if (parts.length === 0) return; // tool-call only, reply still owed
-    const text = parts.map((p: any) => p.text).join("\n\n").trim();
+    // stash (not append): later text in the same turn supersedes earlier
+    lastReplyText = parts.map((p: any) => p.text).join("\n\n").trim();
+  });
+
+  pi.on("agent_settled", async () => {
+    if (!replyOwed || !lastReplyText) return;
     replyOwed = false;
+    const text = lastReplyText;
+    lastReplyText = null;
     await appendFile(
       LOG,
       JSON.stringify({ ts: new Date().toISOString(), kind: "agent_message", text }) + "\n",

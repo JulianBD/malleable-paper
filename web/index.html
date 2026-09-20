@@ -121,6 +121,10 @@
     // sending: enter, shift+enter, or shift+plus
     t.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === '+') {
+        if (!e.shiftKey) {
+          e.preventDefault(); // plain enter/plus does not send — shift is the send gesture
+          return;
+        }
         e.preventDefault();
         f.requestSubmit();
       }
