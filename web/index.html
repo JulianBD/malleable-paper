@@ -7,14 +7,7 @@
   <link rel="stylesheet" href="/house.css" />
 </head>
 <body>
-  <main id="plane">
-    <div class="box" id="box">
-      <div class="handle" data-corner="nw"></div>
-      <div class="handle" data-corner="ne"></div>
-      <div class="handle" data-corner="sw"></div>
-      <div class="handle" data-corner="se"></div>
-    </div>
-  </main>
+  <main id="plane"></main>
 
   <footer id="meta">
     <output id="log" aria-live="polite"></output>
@@ -27,59 +20,128 @@
   </footer>
 
   <script>
-    // ——— box: grab body to move, grab a corner to resize ———
+    // ——— boxes: grab body to move, grab a corner to resize ———
+    // Constraint model (Julian's): every box exposes 4 typed corners
+    // (NE/NW/SE/SW). A corner's type says which quadrant is solid:
+    // NW is solid to its east, NE to its west, SW to its east, SE to its
+    // west (vertically likewise). Moving/resizing scans all corners —
+    // other boxes' and the viewport's four — and clamps against the ones
+    // that face the direction of motion.
     const plane = document.getElementById('plane');
-    const box = document.getElementById('box');
-    let geom = { x: 80, y: 80, w: 240, h: 160 }; // plane coordinates
-    let drag = null; // { mode: 'move'|'resize', corner, px, py, start }
+    const boxes = [
+      { x: 80, y: 80, w: 240, h: 160 },
+      { x: 0, y: 80, w: 240, h: 160 }, // parked on the other side at init
+    ];
+    let drag = null; // { i, mode, corner, px, py, start }
+    const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
     function render() {
-      box.style.left = geom.x + 'px';
-      box.style.top = geom.y + 'px';
-      box.style.width = geom.w + 'px';
-      box.style.height = geom.h + 'px';
+      boxes.forEach((b, i) => {
+        let el = document.getElementById('box' + i);
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'box';
+          el.id = 'box' + i;
+          el.dataset.i = i;
+          for (const c of ['nw', 'ne', 'sw', 'se']) {
+            const h = document.createElement('div');
+            h.className = 'handle';
+            h.dataset.corner = c;
+            el.append(h);
+          }
+          plane.append(el);
+        }
+        el.style.left = b.x + 'px';
+        el.style.top = b.y + 'px';
+        el.style.width = b.w + 'px';
+        el.style.height = b.h + 'px';
+      });
     }
 
-    box.addEventListener('pointerdown', (e) => {
+    // does rect a span past box o in the given axis? (overlap check)
+    const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
+    const xOver = (x0, x1, o) => x0 < o.x + o.w && o.x < x1;
+
+    function tryMove(b, dx, dy) {
+      const pw = plane.clientWidth, ph = plane.clientHeight;
+      const others = boxes.filter((o) => o !== b);
+      // x axis: west corners (NW/SW) bound eastward motion, east corners (NE/SE) westward
+      let x = b.x + dx;
+      for (const o of others) {
+        if (!yOver(b.y, b.y + b.h, o)) continue;
+        if (dx > 0) x = Math.min(x, o.x - b.w);
+        if (dx < 0) x = Math.max(x, o.x + o.w);
+      }
+      x = clamp(x, 0, pw - b.w);
+      // y axis, with x already applied: north corners bound downward motion, south corners upward
+      let y = b.y + dy;
+      for (const o of others) {
+        if (!xOver(x, x + b.w, o)) continue;
+        if (dy > 0) y = Math.min(y, o.y - b.h);
+        if (dy < 0) y = Math.max(y, o.y + o.h);
+      }
+      y = clamp(y, 0, ph - b.h);
+      b.x = x; b.y = y;
+    }
+
+    function tryResize(b, corner, dx, dy) {
+      const pw = plane.clientWidth, ph = plane.clientHeight;
+      const others = boxes.filter((o) => o !== b);
+      const e = { x: b.x, y: b.y, r: b.x + b.w, b: b.y + b.h };
+      let { x, y } = e, r = e.r, btm = e.b;
+      if (corner.includes('e')) {
+        r = e.r + dx;
+        for (const o of others) if (yOver(e.y, e.b, o)) r = Math.min(r, o.x); // o's west corners
+        r = clamp(r, e.x + 20, pw);
+      }
+      if (corner.includes('w')) {
+        x = e.x + dx;
+        for (const o of others) if (yOver(e.y, e.b, o)) x = Math.max(x, o.x + o.w); // o's east corners
+        x = clamp(x, 0, e.r - 20);
+      }
+      if (corner.includes('s')) {
+        btm = e.b + dy;
+        for (const o of others) if (xOver(e.x, e.r, o)) btm = Math.min(btm, o.y); // o's north corners
+        btm = clamp(btm, e.y + 20, ph);
+      }
+      if (corner.includes('n')) {
+        y = e.y + dy;
+        for (const o of others) if (xOver(e.x, e.r, o)) y = Math.max(y, o.y + o.h); // o's south corners
+        y = clamp(y, 0, e.b - 20);
+      }
+      b.x = x; b.y = y; b.w = r - x; b.h = btm - y;
+    }
+
+    plane.addEventListener('pointerdown', (e) => {
+      const boxEl = e.target.closest('.box');
+      if (!boxEl) return;
+      const i = +boxEl.dataset.i;
       const handle = e.target.closest('.handle');
       drag = handle
-        ? { mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...geom } }
-        : { mode: 'move', px: e.clientX, py: e.clientY, start: { ...geom } };
-      box.setPointerCapture(e.pointerId);
+        ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] } }
+        : { i, mode: 'move', px: e.clientX, py: e.clientY, start: { ...boxes[i] } };
+      plane.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
 
-    box.addEventListener('pointermove', (e) => {
+    plane.addEventListener('pointermove', (e) => {
       if (!drag) return;
+      const b = boxes[drag.i];
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
-      const s = drag.start;
-      const pw = plane.clientWidth, ph = plane.clientHeight;
-      const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
-      if (drag.mode === 'move') {
-        geom.x = clamp(s.x + dx, 0, pw - s.w);
-        geom.y = clamp(s.y + dy, 0, ph - s.h);
-      } else {
-        // edges: stationary edge anchors, moving edge clamped to plane
-        let { x, y, w, h } = s;
-        if (drag.corner.includes('e')) w = clamp(s.x + s.w + dx, s.x + 20, pw) - s.x;
-        if (drag.corner.includes('s')) h = clamp(s.y + s.h + dy, s.y + 20, ph) - s.y;
-        if (drag.corner.includes('w')) x = clamp(s.x + dx, 0, s.x + s.w - 20);
-        if (drag.corner.includes('n')) y = clamp(s.y + dy, 0, s.y + s.h - 20);
-        w = (drag.corner.includes('w') ? s.x + s.w : s.x + w) - x;
-        h = (drag.corner.includes('n') ? s.y + s.h : s.y + h) - y;
-        geom = { x, y, w, h };
-      }
+      if (drag.mode === 'move') tryMove(b, dx, dy);
+      else tryResize(b, drag.corner, dx, dy);
       render();
     });
 
-    box.addEventListener('pointerup', (e) => {
-      if (drag) {
-        drag = null;
-        box.releasePointerCapture(e.pointerId);
-        console.log('box', geom);
-      }
+    plane.addEventListener('pointerup', (e) => {
+      if (!drag) return;
+      console.log('box' + drag.i, boxes[drag.i]);
+      drag = null;
+      plane.releasePointerCapture(e.pointerId);
     });
 
+    // park the second box on the other side of the plane
+    boxes[1].x = plane.clientWidth - boxes[1].w - 80;
     render();
 
     // ——— meta drawer (unchanged) ———
