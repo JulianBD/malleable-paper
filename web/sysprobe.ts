@@ -1,0 +1,13 @@
+import { chromium } from "/Users/juliandorsey/Code/malleable-paper/prototypes/interaction/node_modules/playwright/index.js";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.goto("http://localhost:5174", { waitUntil: "networkidle" });
+await page.waitForTimeout(2500);
+await page.keyboard.press("ArrowRight"); await page.keyboard.press("ArrowRight"); await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(500);
+console.log("title:", await page.locator("#frame-title").textContent());
+console.log("sections:", await page.locator(".sys h2").allTextContents());
+console.log("kind rows:", await page.locator(".sys table").first().locator("tr").count());
+console.log("lexicon rows:", await page.locator(".sys table").nth(1).locator("tr").count());
+await page.screenshot({ path: "shots/09-sysframe.png" });
+await browser.close();

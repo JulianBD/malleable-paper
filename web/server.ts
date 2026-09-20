@@ -21,6 +21,7 @@ const SCHEMA = join(root, "..", "schema");
 const DRAIN_MS = 250;
 
 // ——— lexicon registry: kind → required fields (the intake contract) ———
+let lexicons = []; // full lexicon JSONs, served at /registry
 async function loadRegistry() {
   const registry = new Map();
   try {
@@ -28,6 +29,7 @@ async function loadRegistry() {
       if (!f.endsWith(".json")) continue;
       try {
         const lex = JSON.parse(await readFile(join(SCHEMA, f), "utf8"));
+        lexicons.push(lex);
         for (const [kind, spec] of Object.entries(lex?.events?.emits ?? {})) {
           if (kind && typeof spec === "object" && !Array.isArray(spec))
             registry.set(kind, spec.required ?? []);
@@ -100,6 +102,10 @@ const server = Bun.serve({
 
     if (req.method === "GET" && url.pathname === "/queue") {
       return Response.json({ pending: queue.length, rejects, kinds: [...registry.keys()].sort() });
+    }
+
+    if (req.method === "GET" && url.pathname === "/registry") {
+      return Response.json(lexicons);
     }
 
     // canonical intake

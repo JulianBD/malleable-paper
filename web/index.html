@@ -376,6 +376,15 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           renderCards();
         },
       },
+      {
+        title: 'system · the log & the machines',
+        build() {
+          document.getElementById('frames').innerHTML =
+            '<section id="left" class="col"><div id="sysframe"></div></section>';
+          playground = null;
+          renderSys();
+        },
+      },
     ];
 
     let frame = 0;
@@ -539,6 +548,73 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
       }
     }
 
+    // ——— system frame: the system explaining itself, live ———
+    async function renderSys() {
+      const el = document.getElementById('sysframe');
+      if (!el) return;
+      let registry = [], queueInfo = { pending: 0, rejects: [] };
+      try { registry = await (await fetch('/registry')).json(); } catch {}
+      try { queueInfo = await (await fetch('/queue')).json(); } catch {}
+      const counts = new Map();
+      for (const e of latest) counts.set(e.kind, (counts.get(e.kind) || 0) + 1);
+      const last = latest[latest.length - 1];
+
+      let html = '<div class="sys">';
+
+      html += '<h2>the log</h2>';
+      html += '<p>One append-only file, <code>events.jsonl</code>. Every line is an event: ' +
+        '<code>{ts, kind, actor?, …}</code>. Nothing else is authority — every state you see ' +
+        'on any frame is folded from these lines, and refresh re-folds. ' +
+        'Right now it holds <strong>' + latest.length + ' events</strong> across ' +
+        counts.size + ' kinds:</p>';
+      html += '<table><tr><th>kind</th><th>count</th><th>emitted by</th></tr>';
+      const emitters = new Map();
+      for (const lex of registry)
+        for (const k of Object.keys(lex?.events?.emits ?? {}))
+          emitters.set(k, lex.id);
+      for (const [k, n] of [...counts.entries()].sort((a, b) => b[1] - a[1]))
+        html += '<tr><td><code>' + esc(k) + '</code></td><td>' + n + '</td><td>' +
+          esc(emitters.get(k) || '— pre-registry') + '</td></tr>';
+      html += '</table>';
+      if (last) html += '<p>latest line, verbatim:</p><pre>' + esc(JSON.stringify(last)) + '</pre>';
+
+      html += '<h2>the schemas</h2>';
+      html += '<p>One lexicon per object kind, in <code>schema/*.json</code>. Each declares the object\'s ' +
+        '<strong>events</strong> (emits/consumes), its <strong>domain machine</strong> (fold, states, valid ' +
+        'transitions, acts), its <strong>system tick</strong>, and its <strong>render projection</strong>. ' +
+        'The queue enforces them at intake: an act whose kind no lexicon emits, or that is missing a ' +
+        'required field, is rejected at drain. The registry is the grammar of what can happen.</p>';
+      html += '<table><tr><th>lexicon</th><th>emits</th><th>fold</th><th>states</th><th>acts</th></tr>';
+      for (const lex of registry) {
+        const d = lex.domain ?? {};
+        html += '<tr><td><code>' + esc(lex.id) + '</code></td>' +
+          '<td>' + Object.keys(lex?.events?.emits ?? {}).map((k) => '<code>' + esc(k) + '</code>').join(', ') + '</td>' +
+          '<td>' + esc(d.fold ?? '—') + '</td>' +
+          '<td>' + Object.keys(d.states ?? {}).map((s) => '<code>' + esc(s) + '</code>').join(' → ') + '</td>' +
+          '<td>' + Object.keys(d.acts ?? {}).map((a) => '<code>' + esc(a) + '</code>').join(', ') + '</td></tr>';
+      }
+      html += '</table>';
+
+      html += '<h2>the machines</h2>';
+      html += '<p>Frames do not contain objects — frames <em>project</em> them. The objects (the chat, boxes A/B, ' +
+        'cards, the record button, the frame switcher itself) live in the log as event streams; each has exactly ' +
+        'one domain machine folded from those events, wherever it appears. A frame is a choice of which machines ' +
+        'to render. Nothing prevents one object from being projected on two frames, or zero.</p>';
+      html += '<p>Each object runs three machines. <strong>Domain</strong>: data → infer → intend → act — fold the ' +
+        'log into state, derive status, queue intents, emit acts. <strong>System</strong>: when it ticks and where ' +
+        'it reads (the 2s poll, pointer events, page load). <strong>Render</strong>: a pure projection of domain ' +
+        'state to the DOM, plus declared ephemera (drag-in-progress, scroll, the drawer) that never touch the log.</p>';
+      html += '<p>Between intend and act sits <strong>the queue</strong> — this server. Widgets register acts; ' +
+        'every 250ms a drain validates the batch against the registry, stamps commit-time ts, appends. ' +
+        'The drain order <em>is</em> the log order. Pending now: ' + queueInfo.pending +
+        ' · rejected so far: ' + queueInfo.rejects.length + '.</p>';
+      if (queueInfo.rejects.length)
+        html += '<pre>' + esc(queueInfo.rejects.map((r) => r.why + ': ' + (r.act?.kind ?? '?')).join('\n')) + '</pre>';
+
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
     let cursor = 0;
     async function poll() {
       try {
@@ -548,6 +624,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         if (fresh.length) {
           latest = latest.concat(fresh);
           renderCards();
+          renderSys();
           const wasBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
           log.innerHTML = '';
           for (const e of latest) {

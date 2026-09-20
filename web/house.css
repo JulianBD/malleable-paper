@@ -332,3 +332,12 @@ form .status {
 /* card forms are vertical — the bare `form { display:flex }` rule above
    is the chat bar's and was leaking into every form on the plane */
 .card-form { flex-direction: column; align-items: stretch; }
+
+/* system frame: the system explaining itself */
+.sys { padding: 24px; max-width: 860px; overflow-y: auto; font-size: 14px; }
+.sys h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px; }
+.sys h2:first-child { margin-top: 0; }
+.sys p { max-width: 72ch; line-height: 1.45; }
+.sys table { border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+.sys th, .sys td { border: 1px solid #000; padding: 3px 8px; text-align: left; vertical-align: top; }
+.sys pre { border: 1px solid #000; padding: 8px; font-size: 11px; overflow-x: auto; max-width: 100%; white-space: pre-wrap; word-break: break-all; }
