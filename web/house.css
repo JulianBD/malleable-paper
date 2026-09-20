@@ -67,6 +67,8 @@ body {
 main#plane {
   position: relative;
   overflow: hidden;
+  flex: 1;
+  margin: 8px;
 }
 .box {
   position: absolute;
