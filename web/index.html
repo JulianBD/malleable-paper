@@ -7,38 +7,71 @@
   <style>
     :root { color-scheme: light; }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #fff;
       color: #000;
       font-family: Inter, "Helvetica Neue", Arial, sans-serif;
       font-size: 16px;
-    }
-    form {
-      width: min(640px, calc(100vw - 48px));
       display: flex;
       flex-direction: column;
-      gap: 12px;
     }
-    textarea {
+    /* the paper: a blank page you annotate on */
+    .canvas {
+      flex: 1;
       width: 100%;
-      height: 160px;
-      padding: 12px;
+      border: 0;
+      outline: none;
+      resize: none;
+      padding: 48px max(48px, calc((100vw - 720px) / 2));
+      background: #fff;
+      color: #000;
+      font: inherit;
+      font-size: 17px;
+      line-height: 1.7;
+    }
+    .canvas::placeholder { color: #bbb; }
+    /* meta: slides up from the bottom */
+    .meta {
+      border-top: 1px solid #000;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .meta .log {
+      max-height: 0;
+      overflow-y: auto;
+      transition: max-height .25s ease;
+      padding: 0 24px;
+    }
+    .meta.open .log {
+      max-height: 36vh;
+      padding: 10px 24px;
+    }
+    .log .msg { margin: 2px 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
+    .log .who { font-weight: 600; margin-right: 8px; }
+    .log .human .who::after { content: " · julian"; font-weight: 400; }
+    .log .ts { font-size: 11px; color: #666; margin-left: 8px; }
+    .bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 24px;
+      align-items: center;
+    }
+    .bar input {
+      flex: 1;
+      padding: 8px 12px;
       border: 1px solid #000;
       border-radius: 0;
       background: #fff;
       color: #000;
       font: inherit;
-      resize: vertical;
     }
-    textarea:focus { outline: 2px solid #000; outline-offset: -1px; }
-    button {
-      align-self: flex-end;
-      padding: 8px 24px;
+    .bar input:focus { outline: 2px solid #000; outline-offset: -1px; }
+    .bar button {
+      padding: 8px 16px;
       border: 1px solid #000;
       border-radius: 0;
       background: #000;
@@ -46,40 +79,48 @@
       font: inherit;
       cursor: pointer;
     }
-    button:disabled { background: #666; border-color: #666; cursor: default; }
-    form { padding-bottom: 48px; }
-    .status { min-height: 1.4em; font-size: 13px; color: #000; }
-    .log {
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      max-height: 40vh;
-      overflow-y: auto;
-      padding: 12px 24px;
-      border-top: 1px solid #000;
+    .bar button:disabled { background: #666; border-color: #666; cursor: default; }
+    .bar .toggle {
       background: #fff;
-      font-size: 14px;
-      line-height: 1.5;
+      color: #000;
+      border: 1px solid #000;
+      white-space: nowrap;
     }
-    .log .msg { margin: 2px 0; white-space: pre-wrap; }
-    .log .who { font-weight: 600; margin-right: 8px; }
-    .log .ts { font-size: 11px; color: #666; margin-left: 8px; }
-    .log .human .who::after { content: " · julian"; font-weight: 400; }
+    .status { font-size: 12px; color: #666; min-width: 3em; text-align: right; }
   </style>
 </head>
 <body>
-  <form id="f">
-    <textarea id="t" placeholder="write" autofocus></textarea>
-    <button id="b" type="submit">send</button>
-    <div class="status" id="s"></div>
-  </form>
-  <div class="log" id="log"></div>
+  <textarea class="canvas" id="canvas" placeholder="write" autofocus></textarea>
+
+  <div class="meta" id="meta">
+    <div class="log" id="log"></div>
+    <form class="bar" id="f">
+      <button type="button" class="toggle" id="toggle">meta ▴</button>
+      <input id="t" placeholder="message the paper" autocomplete="off" />
+      <button id="b" type="submit">send</button>
+      <div class="status" id="s"></div>
+    </form>
+  </div>
+
   <script>
     const f = document.getElementById('f'),
           t = document.getElementById('t'),
           b = document.getElementById('b'),
-          s = document.getElementById('s');
+          s = document.getElementById('s'),
+          log = document.getElementById('log'),
+          meta = document.getElementById('meta'),
+          toggle = document.getElementById('toggle');
+
+    // meta drawer
+    toggle.addEventListener('click', () => {
+      const open = meta.classList.toggle('open');
+      toggle.textContent = open ? 'meta ▾' : 'meta ▴';
+      if (open) log.scrollTop = log.scrollHeight;
+    });
+
+    // sending: enter, shift+enter, or shift+plus
     t.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.shiftKey) {
+      if (e.key === 'Enter' || e.key === '+') {
         e.preventDefault();
         f.requestSubmit();
       }
@@ -88,7 +129,7 @@
       e.preventDefault();
       const text = t.value.trim();
       if (!text) return;
-      b.disabled = true; s.textContent = 'sending…';
+      b.disabled = true; s.textContent = '…';
       try {
         const r = await fetch('/message', {
           method: 'POST',
@@ -97,20 +138,24 @@
         });
         if (!r.ok) throw new Error(await r.text());
         t.value = '';
-        s.textContent = 'logged ' + new Date().toLocaleTimeString();
+        s.textContent = '✓';
+        meta.classList.add('open');
+        toggle.textContent = 'meta ▾';
       } catch (err) {
-        s.textContent = 'failed: ' + err.message;
+        s.textContent = 'failed';
       } finally {
         b.disabled = false;
         t.focus();
       }
     });
-    const log = document.getElementById('log');
+
+    // polling the shared log
     let seen = -1;
     async function poll() {
       try {
         const events = await (await fetch('/events')).json();
         if (events.length > seen) {
+          const wasBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
           seen = events.length;
           log.innerHTML = '';
           for (const e of events) {
@@ -128,7 +173,7 @@
             div.append(who, text, ts);
             log.append(div);
           }
-          log.scrollTop = log.scrollHeight;
+          if (wasBottom || meta.classList.contains('open')) log.scrollTop = log.scrollHeight;
         }
       } catch {}
     }
