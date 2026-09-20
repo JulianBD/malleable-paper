@@ -464,25 +464,61 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     function renderCards() {
       const field = document.getElementById('cardfield');
       if (!field) return;
-      const cards = new Map();
-      for (const e of latest) if (e.kind === 'card') cards.set(e.id, e);
+      const cards = new Map(), responses = new Map();
+      for (const e of latest) {
+        if (e.kind === 'card') cards.set(e.id, e);
+        if (e.kind === 'card_response') responses.set(e.card, e);
+      }
       field.innerHTML = '';
       if (!cards.size) {
         field.innerHTML = '<p class="card-empty">nothing pending — paper wants for nothing.</p>';
         return;
       }
       for (const c of [...cards.values()].reverse()) {
+        const resp = responses.get(c.id);
+        const status = resp ? 'ruled' : (c.status || 'pending');
         const el = document.createElement('div');
-        el.className = 'card ' + (c.status || 'pending');
+        el.className = 'card ' + status;
         let html = '<div class="card-head"><strong>' + c.title + '</strong>' +
-          '<span class="card-status">' + (c.status || 'pending') + '</span></div>';
+          '<span class="card-status">' + status + '</span></div>';
         if (c.table) {
           html += '<table><tr>' + c.table.columns.map((h) => '<th>' + h + '</th>').join('') + '</tr>';
           for (const r of c.table.rows) html += '<tr>' + r.map((x) => '<td>' + x + '</td>').join('') + '</tr>';
           html += '</table>';
         }
         if (c.note) html += '<p class="card-note">' + c.note + '</p>';
+        if (c.form && !resp) {
+          html += '<form class="card-form">';
+          for (const f of c.form.fields) {
+            html += '<div class="card-field"><span class="card-ref">' + f.ref + '</span>';
+            for (const o of f.options)
+              html += '<label><input type="radio" name="' + f.ref + '" value="' + o.k + '">' + o.k + ' — ' + o.label + '</label>';
+            html += '</div>';
+          }
+          html += '<textarea placeholder="write-in: anything else you want to send with this ruling"></textarea>';
+          html += '<button type="submit">rule it</button></form>';
+        }
+        if (resp) {
+          html += '<p class="card-note">ruled: ' + JSON.stringify(resp.picks || {}) +
+            (resp.note ? ' — ' + resp.note : '') + '</p>';
+        }
         el.innerHTML = html;
+        const formEl = el.querySelector('form');
+        if (formEl) formEl.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const picks = {};
+          for (const f of c.form.fields) {
+            const v = formEl.querySelector('input[name="' + f.ref + '"]:checked');
+            if (v) picks[f.ref] = v.value;
+          }
+          const note = formEl.querySelector('textarea').value.trim();
+          await fetch('/event', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ kind: 'card_response', card: c.id, picks, note, actor: 'julian' }),
+          });
+          poll();
+        });
         field.append(el);
       }
     }

@@ -63,9 +63,12 @@ export default function (pi: ExtensionAPI) {
     const events = await readLines();
     for (let i = offset; i < events.length; i++) {
       const e = events[i];
-      if (e.kind !== "human_message") continue;
+      let text: string | null = null;
       const stamp = e.ts?.slice(11, 19) ?? "";
-      const text = `[browser ${stamp}] ${e.text}`;
+      if (e.kind === "human_message") text = `[browser ${stamp}] ${e.text}`;
+      if (e.kind === "card_response")
+        text = `[card ${stamp}] ${e.card}: ${JSON.stringify(e.picks ?? {})}${e.note ? ` — ${e.note}` : ""}`;
+      if (!text) continue;
       try {
         pi.sendUserMessage(text, { deliverAs: "steer" });
       } catch {
