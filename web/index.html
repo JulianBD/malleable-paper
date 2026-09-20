@@ -36,12 +36,30 @@
     // approach it (direction guard), and axes resolve dominant-first.
     const plane = document.getElementById('plane');
     let playground = null; // set when the geometry frame is built
+    let latest = []; // the folded event log — declared up top: foldGeometry runs at first frame build
     const boxes = [
       { name: 'A', x: 40, y: 40, w: 200, h: 140 },
       { name: 'B', x: 0, y: 40, w: 200, h: 140 },
     ];
     let drag = null; // { i, mode, corner, px, py, start, cont }
     const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+    // ——— hydration: fold geometry events into the plane ———
+    // No stored state (ruling 6): positions are derived from the log every
+    // time the frame builds. box_drag samples throttle at 80ms and every
+    // release follows with box_geometry, so last-event-per-name lands on
+    // the release act. Unknown names are ignored — node creation (feature
+    // 3) will earn their handling.
+    function foldGeometry() {
+      const g = new Map();
+      for (const e of latest)
+        if ((e.kind === 'box_geometry' || e.kind === 'box_drag') && e.name && e.geom)
+          g.set(e.name, e.geom);
+      for (const b of boxes) {
+        const v = g.get(b.name);
+        if (v) Object.assign(b, { x: v.x, y: v.y, w: v.w, h: v.h });
+      }
+    }
 
     function render() {
       if (!playground) return; // geometry frame not mounted
@@ -313,7 +331,10 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         return;
       }
       if (!drag) return;
-      if (recording) {
+      // hydration ruling (feature 1): every release is a durable geometry
+      // act — the resting position is a domain fact. record brackets keep
+      // their meaning for the throttled box_drag motion samples only.
+      {
         const b = boxes[drag.i];
         logEvent({ kind: 'box_geometry', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
       }
@@ -354,7 +375,8 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           playground = document.getElementById('playground');
           makeDoc(document.getElementById('doc'), PAGES);
           makeDoc(document.getElementById('contract'), [CONTRACT], false);
-          boxes[1].x = playground.clientWidth - boxes[1].w - 40;
+          boxes[1].x = playground.clientWidth - boxes[1].w - 40; // fresh-log default
+          foldGeometry(); // hydration (F): the log is the only geometry memory
           render();
         },
       },
@@ -503,7 +525,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     // ——— cards: adjudication requests, presented on the plane ———
     // fold: latest card event per id. A card is paper's intent made
     // visible: it wants a ruling; chat (for now) is the reply channel.
-    let latest = [];
+    // (latest now declared up top — foldGeometry needs it at first build)
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     function renderCards() {
       const field = document.getElementById('cardfield');
@@ -653,6 +675,13 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         cursor = r.cursor;
         if (fresh.length) {
           latest = latest.concat(fresh);
+          // hydration live-half: new geometry acts re-fold into the plane
+          // (skip mid-drag — the gesture owns the box until release)
+          if (frame === 0 && playground && !drag &&
+              fresh.some((e) => e.kind === 'box_geometry' || e.kind === 'box_drag')) {
+            foldGeometry();
+            render();
+          }
           renderCards();
           renderSys();
           syncFrames();

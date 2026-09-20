@@ -1,0 +1,11 @@
+import { chromium } from "../prototypes/interaction/node_modules/playwright/index.js";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.on("console", (m) => console.log("console:", m.type(), m.text().slice(0, 300)));
+page.on("pageerror", (e) => console.log("pageerror:", String(e).slice(0, 500)));
+await page.goto("http://localhost:5174", { waitUntil: "networkidle" });
+await page.waitForTimeout(3000);
+console.log("box0 count:", await page.locator("#box0").count());
+console.log("title:", await page.locator("#frame-title").textContent());
+console.log("frames html len:", (await page.locator("#frames").innerHTML()).length);
+await browser.close();
