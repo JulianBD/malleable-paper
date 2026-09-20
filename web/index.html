@@ -39,6 +39,19 @@
     let sketch = false; // sketch frame: nodes/edges render, boxes don't collide
     let latest = []; // the folded event log — declared up top: foldGeometry runs at first frame build
     let edges = []; // folded paper.edge events (latest per id)
+    // ——— incremental folds (unit 8): the keyed-merge monoid ———
+    // Each fold is a monoid homomorphism: state = Map(key → letter), the
+    // merge is latest-wins per key, and a fresh letter integrates in O(1)
+    // at intake — the poll never re-scans the log. The maps are maintained
+    // continuously (letters merge even while another frame is mounted);
+    // foldNodes/foldEdges/foldGeometry are now PROJECTIONS of the state,
+    // not re-integrations of history.
+    const foldState = { nodes: new Map(), edges: new Map(), geom: new Map() };
+    function applyLetter(e) {
+      if (e.kind === 'node' && e.id) foldState.nodes.set(e.id, e);
+      else if (e.kind === 'edge' && e.id) foldState.edges.set(e.id, e);
+      else if ((e.kind === 'box_geometry' || e.kind === 'box_drag') && e.name && e.geom) foldState.geom.set(e.name, e.geom);
+    }
     let link = null; // rubber-band gesture: { from, px, py }
     let verbAsk = null; // dropped arrow awaiting its verb: { from, to, el }
     const boxes = [
@@ -55,12 +68,8 @@
     // the release act. Unknown names are ignored — geometry applies to
     // whichever boxes the current frame provides (A/B, or folded nodes).
     function foldGeometry() {
-      const g = new Map();
-      for (const e of latest)
-        if ((e.kind === 'box_geometry' || e.kind === 'box_drag') && e.name && e.geom)
-          g.set(e.name, e.geom);
       for (const b of boxes) {
-        const v = g.get(b.name);
+        const v = foldState.geom.get(b.name);
         if (v) Object.assign(b, { x: v.x, y: v.y, w: v.w, h: v.h });
       }
     }
@@ -70,20 +79,16 @@
     // Node geometry is owned by box_geometry acts (name = node id), so a
     // dragged node is just a box whose name is an id — one gesture machine.
     function foldNodes() {
-      const n = new Map();
-      for (const e of latest) if (e.kind === 'node' && e.id) n.set(e.id, e);
       boxes.length = 0;
       // superseded re-emits fold to absent (identity survives; presence doesn't)
-      for (const e of n.values()) {
+      for (const e of foldState.nodes.values()) {
         if (e.superseded) continue;
         const g = e.geom ?? { x: 40, y: 40, w: 180, h: 56 };
         boxes.push({ name: e.id, label: e.label, kind: e.node_kind, x: g.x, y: g.y, w: g.w, h: g.h });
       }
     }
     function foldEdges() {
-      const m = new Map();
-      for (const e of latest) if (e.kind === 'edge' && e.id) m.set(e.id, e);
-      edges = [...m.values()].filter((e) => !e.superseded);
+      edges = [...foldState.edges.values()].filter((e) => !e.superseded);
     }
 
     // ——— pan/zoom (unit 9): the view is ephemeral presentation state ———
@@ -1097,6 +1102,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         cursor = r.cursor;
         if (fresh.length) {
           latest = latest.concat(fresh);
+          for (const e of fresh) applyLetter(e); // O(1) per letter — the fold integrates at intake
           // hydration live-half + graph live-half: new acts re-fold into the
           // active plane (skip mid-gesture — the gesture owns the box until
           // release; the rubber band owns the edge layer until drop)
