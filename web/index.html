@@ -7,7 +7,15 @@
   <link rel="stylesheet" href="/house.css" />
 </head>
 <body>
-  <main id="plane"></main>
+  <main id="plane">
+    <section id="left">
+      <section id="playground"></section>
+      <article class="box doc" id="doc"></article>
+    </section>
+    <section id="right">
+      <article class="box doc reader" id="contract"></article>
+    </section>
+  </main>
 
   <footer id="meta">
     <output id="log" aria-live="polite"></output>
@@ -25,20 +33,127 @@
 
   <script>
     // ——— boxes: grab body to move, grab a corner to resize ———
-    // Constraint model (Julian's): every box exposes 4 typed corners
-    // (NE/NW/SE/SW). A corner's type says which quadrant is solid:
-    // NW is solid to its east, NE to its west, SW to its east, SE to its
-    // west (vertically likewise). Moving/resizing scans all corners —
-    // other boxes' and the viewport's four — and clamps against the ones
-    // that face the direction of motion.
+    // Bounds are the playground subframe; A and B collide with each other.
+    // The corner contract: every box exposes 4 typed corners; a corner's
+    // type declares which quadrant is solid. A bound applies only if you
+    // approach it (direction guard), and axes resolve dominant-first.
     const plane = document.getElementById('plane');
+    const playground = document.getElementById('playground');
     const boxes = [
-      { name: 'A', x: 80, y: 80, w: 240, h: 160 },
-      { name: 'B', x: 0, y: 80, w: 240, h: 160 }, // parked on the other side at init
-      { x: 0, y: 0, w: 380, h: 260, doc: true }, // the walkthrough box
+      { name: 'A', x: 40, y: 40, w: 200, h: 140 },
+      { name: 'B', x: 0, y: 40, w: 200, h: 140 },
     ];
-    let drag = null; // { i, mode, corner, px, py, start }
+    let drag = null; // { i, mode, corner, px, py, start, cont }
     const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+    function render() {
+      boxes.forEach((b, i) => {
+        let el = document.getElementById('box' + i);
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'box';
+          el.id = 'box' + i;
+          el.dataset.i = i;
+          const label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = b.name ?? '';
+          el.append(label);
+          for (const c of ['nw', 'ne', 'sw', 'se']) {
+            const h = document.createElement('div');
+            h.className = 'handle';
+            h.dataset.corner = c;
+            el.append(h);
+          }
+          playground.append(el);
+        }
+        el.style.left = b.x + 'px';
+        el.style.top = b.y + 'px';
+        el.style.width = b.w + 'px';
+        el.style.height = b.h + 'px';
+      });
+    }
+
+    const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
+    const xOver = (x0, x1, o) => x0 < o.x + o.w && o.x < x1;
+
+    function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
+      const pw = drag.cont.clientWidth, ph = drag.cont.clientHeight;
+      const others = boxes.filter((o) => o !== drag.target);
+      // resolve the DOMINANT axis first, so the second axis's overlap test
+      // sees the updated position — diagonal escapes aren't pinned by a
+      // stale start-span overlap
+      const clampX = (y0, y1) => {
+        let x = s.x + dx;
+        for (const o of others) {
+          if (!yOver(y0, y1, o)) continue;
+          if (dx > 0 && o.x >= s.x + s.w) x = Math.min(x, o.x - s.w);
+          if (dx < 0 && o.x + o.w <= s.x) x = Math.max(x, o.x + o.w);
+        }
+        return clamp(x, 0, pw - s.w);
+      };
+      const clampY = (x0, x1) => {
+        let y = s.y + dy;
+        for (const o of others) {
+          if (!xOver(x0, x1, o)) continue;
+          if (dy > 0 && o.y >= s.y + s.h) y = Math.min(y, o.y - s.h);
+          if (dy < 0 && o.y + o.h <= s.y) y = Math.max(y, o.y + o.h);
+        }
+        return clamp(y, 0, ph - s.h);
+      };
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const x = clampX(s.y, s.y + s.h);
+        return { x, y: clampY(x, x + s.w) };
+      }
+      const y = clampY(s.x, s.x + s.w);
+      return { y, x: clampX(y, y + s.h) };
+    }
+
+    function tryResize(s, corner, dx, dy) { // returns final {x, y, w, h}
+      const pw = drag.cont.clientWidth, ph = drag.cont.clientHeight;
+      const others = boxes.filter((o) => o !== drag.target);
+      const e = { x: s.x, y: s.y, r: s.x + s.w, b: s.y + s.h };
+      let { x, y } = e, r = e.r, btm = e.b;
+      if (corner.includes('e')) {
+        r = e.r + dx;
+        for (const o of others) if (yOver(e.y, e.b, o) && o.x >= e.r) r = Math.min(r, o.x);
+        r = clamp(r, e.x + 20, pw);
+      }
+      if (corner.includes('w')) {
+        x = e.x + dx;
+        for (const o of others) if (yOver(e.y, e.b, o) && o.x + o.w <= e.x) x = Math.max(x, o.x + o.w);
+        x = clamp(x, 0, e.r - 20);
+      }
+      if (corner.includes('s')) {
+        btm = e.b + dy;
+        for (const o of others) if (xOver(e.x, e.r, o) && o.y >= e.b) btm = Math.min(btm, o.y);
+        btm = clamp(btm, e.y + 20, ph);
+      }
+      if (corner.includes('n')) {
+        y = e.y + dy;
+        for (const o of others) if (xOver(e.x, e.r, o) && o.y + o.h <= e.y) y = Math.max(y, o.y + o.h);
+        y = clamp(y, 0, e.b - 20);
+      }
+      return { x, y, w: r - x, h: btm - y };
+    }
+
+    // ——— doc boxes: swipeable pseudocode / prose pages ———
+    function makeDoc(el, pages, swipeable = true) {
+      el.innerHTML = '<div class="page"></div>' +
+        (swipeable ? '<button class="nav prev">‹</button><button class="nav next">›</button><div class="pager"></div>' : '');
+      let page = 0;
+      const show = (n) => {
+        page = Math.max(0, Math.min(pages.length - 1, n));
+        el.querySelector('.page').textContent = pages[page];
+        const pager = el.querySelector('.pager');
+        if (pager) pager.textContent = (page + 1) + '/' + pages.length;
+      };
+      const prev = el.querySelector('.prev'), next = el.querySelector('.next');
+      if (prev) prev.addEventListener('click', () => show(page - 1));
+      if (next) next.addEventListener('click', () => show(page + 1));
+      el._show = show;
+      el._pages = pages.length;
+      show(0);
+    }
 
     const PAGES = [
       `— gesture model —
@@ -68,167 +183,71 @@ every box exposes 4 typed corners:
 (and vertically: N corners
  are solid downward, S upward)
 
-the viewport is 4 more corners
-at the frame edges — bounds
-are just corners facing you`,
+the frame is 4 more corners
+at its edges — bounds are
+just corners facing you`,
       `— move clamp —
 
-x = start.x + dx
-for other box o, vertical overlap:
-  if dx > 0:
-    x = min(x, o.x - w)      // o's W corners
-  if dx < 0:
-    x = max(x, o.x + o.w)    // o's E corners
-x = clamp(x, 0, planeW - w)
+resolve DOMINANT axis first;
+the other axis then sees the
+updated position.
 
-then y, same shape, with x
-already applied (per-axis, in
-order — see page 5)`,
+x = start.x + dx
+for o, vertical overlap:
+  if dx>0 and o.x >= start.r:
+    x = min(x, o.x - w)
+  if dx<0 and o.x+o.w <= start.x:
+    x = max(x, o.x + o.w)
+x = clamp(x, 0, frameW - w)
+
+then y, same shape.`,
       `— resize clamp —
 
 only the moving edge changes;
 the stationary edge anchors.
 
 E edge: r = start.r + dx
-  for o, vertical overlap:
+  for o, vertical overlap,
+      o east of us:
     r = min(r, o.x)
-  r = clamp(r, start.x+20, planeW)
+  r = clamp(r, start.x+20, frameW)
 
 W, S, N symmetric. Min size
 20px throughout.`,
-      `— the bug / the fix —
+      `— open corners —
 
-BUG: bounds fire regardless of
-which SIDE o is on. Dragging
-left applies o's east edge even
-when o is to the RIGHT →
-the box teleports past it.
-
-FIX: guard by direction —
-  if dx > 0 and o.x >= start.r:
-    x = min(x, o.x - w)
-  if dx < 0 and o.x+o.w <= start.x:
-    x = max(x, o.x + o.w)
-
-(the corner TYPE was meant to
-carry exactly this information;
-the first draft dropped it)`,
+flanked on BOTH axes at once,
+no ordering escapes: the box
+corner-locks until you drag
+axis-pure. The honest fix is a
+2D corner-contact resolve —
+earned when a recorded
+trajectory proves it matters.`,
     ];
+    makeDoc(document.getElementById('doc'), PAGES);
 
-    function render() {
-      boxes.forEach((b, i) => {
-        let el = document.getElementById('box' + i);
-        if (!el) {
-          el = document.createElement('div');
-          el.className = 'box' + (b.doc ? ' doc' : '');
-          el.id = 'box' + i;
-          el.dataset.i = i;
-          if (b.doc) {
-            el.innerHTML = '<div class="page"></div>' +
-              '<button class="nav prev">‹</button>' +
-              '<button class="nav next">›</button>' +
-              '<div class="pager"></div>';
-            let page = 0;
-            const show = (n) => {
-              page = Math.max(0, Math.min(PAGES.length - 1, n));
-              el.querySelector('.page').textContent = PAGES[page];
-              el.querySelector('.pager').textContent = (page + 1) + '/' + PAGES.length;
-            };
-            el.querySelector('.prev').addEventListener('click', () => show(page - 1));
-            el.querySelector('.next').addEventListener('click', () => show(page + 1));
-            el._show = show;
-            show(0);
-          } else {
-            const label = document.createElement('span');
-            label.className = 'label';
-            label.textContent = b.name ?? '';
-            el.append(label);
-            for (const c of ['nw', 'ne', 'sw', 'se']) {
-              const h = document.createElement('div');
-              h.className = 'handle';
-              h.dataset.corner = c;
-              el.append(h);
-            }
-          }
-          plane.append(el);
-        }
-        el.style.left = b.x + 'px';
-        el.style.top = b.y + 'px';
-        el.style.width = b.w + 'px';
-        el.style.height = b.h + 'px';
-      });
-    }
+    const CONTRACT = `The corner contract
 
-    // does rect a span past box o in the given axis? (overlap check)
-    const yOver = (y0, y1, o) => y0 < o.y + o.h && o.y < y1;
-    const xOver = (x0, x1, o) => x0 < o.x + o.w && o.x < x1;
+A box is not a rectangle of area; it is four points with attitudes. Each corner carries a type — NW, NE, SW, SE — and the type declares which quadrant is solid: an NW corner is solid to its east, an NE to its west, an SW to its east, an SE to its west; north corners are solid downward, south corners upward.
 
-    function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
-      const pw = plane.clientWidth, ph = plane.clientHeight;
-      const others = boxes.filter((o) => o !== drag.target);
-      // resolve the DOMINANT axis first, so the second axis's overlap test
-      // sees the updated position — a diagonal escape isn't pinned by a
-      // stale start-span overlap (B sliding up-and-right out from beside A)
-      const clampX = (y0, y1) => {
-        let x = s.x + dx;
-        for (const o of others) {
-          if (!(y0 < o.y + o.h && o.y < y1)) continue;
-          if (dx > 0 && o.x >= s.x + s.w) x = Math.min(x, o.x - s.w);
-          if (dx < 0 && o.x + o.w <= s.x) x = Math.max(x, o.x + o.w);
-        }
-        return clamp(x, 0, pw - s.w);
-      };
-      const clampY = (x0, x1) => {
-        let y = s.y + dy;
-        for (const o of others) {
-          if (!(x0 < o.x + o.w && o.x < x1)) continue;
-          if (dy > 0 && o.y >= s.y + s.h) y = Math.min(y, o.y - s.h);
-          if (dy < 0 && o.y + o.h <= s.y) y = Math.max(y, o.y + o.h);
-        }
-        return clamp(y, 0, ph - s.h);
-      };
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        const x = clampX(s.y, s.y + s.h);
-        return { x, y: clampY(x, x + s.w) };
-      }
-      const y = clampY(s.x, s.x + s.w);
-      return { y, x: clampX(y, y + s.h) };
-    }
+A frame is just four more corners at its edges. So "bounds checking" and "collision" are the same operation: scan every corner that faces your direction of motion, and stop at the nearest one.
 
-    function tryResize(s, corner, dx, dy) { // returns final {x, y, w, h}
-      const pw = plane.clientWidth, ph = plane.clientHeight;
-      const others = boxes.filter((o) => o !== drag.target);
-      const e = { x: s.x, y: s.y, r: s.x + s.w, b: s.y + s.h };
-      let { x, y } = e, r = e.r, btm = e.b;
-      if (corner.includes('e')) {
-        r = e.r + dx;
-        for (const o of others) if (yOver(e.y, e.b, o) && o.x >= e.r) r = Math.min(r, o.x); // o's west corners, only if o is east of us
-        r = clamp(r, e.x + 20, pw);
-      }
-      if (corner.includes('w')) {
-        x = e.x + dx;
-        for (const o of others) if (yOver(e.y, e.b, o) && o.x + o.w <= e.x) x = Math.max(x, o.x + o.w); // o's east corners, only if west of us
-        x = clamp(x, 0, e.r - 20);
-      }
-      if (corner.includes('s')) {
-        btm = e.b + dy;
-        for (const o of others) if (xOver(e.x, e.r, o) && o.y >= e.b) btm = Math.min(btm, o.y);
-        btm = clamp(btm, e.y + 20, ph);
-      }
-      if (corner.includes('n')) {
-        y = e.y + dy;
-        for (const o of others) if (xOver(e.x, e.r, o) && o.y + o.h <= e.y) y = Math.max(y, o.y + o.h);
-        y = clamp(y, 0, e.b - 20);
-      }
-      return { x, y, w: r - x, h: btm - y };
-    }
+Two clauses make the contract honest:
 
-    // swipe pages on the doc box (it is not draggable)
+Approach. A corner bounds you only if you approach it. A box sitting to your west never blocks your eastward drag, no matter how close — its east corners point the wrong way. The first draft of this page dropped that clause and boxes teleported; the corner type carries exactly this information, which is the point of typing corners at all.
+
+Order. When a drag moves diagonally, the dominant axis resolves first, and the second axis then measures overlap against the updated position — so a box sliding up-and-out from beside a neighbor is free the moment its edge actually clears, not stuck until you release and re-grab.
+
+One clause is still owed: a box flanked on both axes at once — one neighbor east, another south — can lock in a corner, because no ordering of two 1-dimensional resolutions escapes a 2-dimensional trap. The contract will close when a recorded trajectory earns the full corner-contact resolve: corners meeting corners, not edges sweeping spans.`;
+    makeDoc(document.getElementById('contract'), [CONTRACT], false);
+
+    // ——— gestures: drag in the playground, swipe in doc boxes ———
     let swipe = null;
     plane.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.nav')) return; // let the page buttons click
       const docEl = e.target.closest('.box.doc');
       if (docEl) {
+        if (!docEl.querySelector('.pager')) return; // not swipeable (reader)
         swipe = { el: docEl, px: e.clientX, page: +docEl.querySelector('.pager').textContent.split('/')[0] - 1 };
         plane.setPointerCapture(e.pointerId);
         e.preventDefault();
@@ -239,30 +258,13 @@ the first draft dropped it)`,
       const i = +boxEl.dataset.i;
       const handle = e.target.closest('.handle');
       drag = handle
-        ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i] }
-        : { i, mode: 'move', px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i] };
+        ? { i, mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i], cont: playground }
+        : { i, mode: 'move', px: e.clientX, py: e.clientY, start: { ...boxes[i] }, target: boxes[i], cont: playground };
       plane.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
 
-    let lastSample = 0;
-    plane.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
-      const g = drag.mode === 'move'
-        ? tryMove(drag.start, dx, dy)
-        : tryResize(drag.start, drag.corner, dx, dy);
-      Object.assign(boxes[drag.i], g);
-      render();
-      // motion capture while recording: throttled samples, then the release act
-      if (recording && Date.now() - lastSample > 80) {
-        lastSample = Date.now();
-        const b = boxes[drag.i];
-        logEvent({ kind: 'box_drag', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
-      }
-    });
-
-    // record: toggle position tracking — snapshot on start, then every release
+    // record: toggle position tracking — snapshot on start, samples while dragging, act on release
     const recordBtn = document.getElementById('record');
     let recording = false;
     async function logEvent(ev) {
@@ -280,9 +282,24 @@ the first draft dropped it)`,
       recordBtn.classList.toggle('active', recording);
       if (recording) {
         for (const b of boxes) {
-          if (b.doc) continue;
           logEvent({ kind: 'box_geometry', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
         }
+      }
+    });
+
+    let lastSample = 0;
+    plane.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
+      const g = drag.mode === 'move'
+        ? tryMove(drag.start, dx, dy)
+        : tryResize(drag.start, drag.corner, dx, dy);
+      Object.assign(boxes[drag.i], g);
+      render();
+      if (recording && Date.now() - lastSample > 80) {
+        lastSample = Date.now();
+        const b = boxes[drag.i];
+        logEvent({ kind: 'box_drag', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
       }
     });
 
@@ -304,13 +321,11 @@ the first draft dropped it)`,
       plane.releasePointerCapture(e.pointerId);
     });
 
-    // park the second box on the other side; center the doc box below
-    boxes[1].x = plane.clientWidth - boxes[1].w - 80;
-    boxes[2].x = (plane.clientWidth - boxes[2].w) / 2;
-    boxes[2].y = plane.clientHeight - boxes[2].h - 40;
+    // park B on the other side of the playground
+    boxes[1].x = playground.clientWidth - boxes[1].w - 40;
     render();
 
-    // ——— meta drawer (unchanged) ———
+    // ——— meta drawer ———
     const f = document.getElementById('f'),
           t = document.getElementById('t'),
           b = document.getElementById('b'),
@@ -357,15 +372,15 @@ the first draft dropped it)`,
 
     // tiny markdown subset: code blocks, inline code, bold, italic, links, lists, paragraphs
     function md(src) {
-      let s = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      s = s.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
-      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
-      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-      s = s.replace(/(^|\n)((?:- .*\n?)+)/g, (_, pre, list) =>
+      let s2 = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      s2 = s2.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
+      s2 = s2.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s2 = s2.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s2 = s2.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+      s2 = s2.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      s2 = s2.replace(/(^|\n)((?:- .*\n?)+)/g, (_, pre, list) =>
         pre + '<ul>' + list.trim().split('\n').map((l) => '<li>' + l.slice(2) + '</li>').join('') + '</ul>');
-      return s.split(/\n{2,}/).map((p) =>
+      return s2.split(/\n{2,}/).map((p) =>
         /^<(ul|pre)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
     }
 

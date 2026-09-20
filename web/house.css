@@ -100,6 +100,12 @@ form .region.active { background: #000; color: #fff; }
   padding: 2px 0 4px;
 }
 
+.box.doc.reader .page {
+  font: 15px/1.75 Georgia, "Times New Roman", serif;
+  white-space: normal;
+  padding: 18px 22px;
+}
+
 /* page furniture */
 html, body { height: 100%; }
 body {
@@ -113,12 +119,28 @@ body {
 }
 
 /* the plane and the box — geometry before semantics */
+/* the plane: two columns — playground + algorithm left, reader right */
 main#plane {
   position: relative;
-  overflow: hidden;
   flex: 1;
   margin: 8px;
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
 }
+main#plane > section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+#playground {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+#doc, #contract { flex: 1; }
 .box {
   position: absolute;
   border: 1px solid #000;
