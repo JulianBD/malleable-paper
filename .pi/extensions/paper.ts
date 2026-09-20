@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LOG = join(HERE, "..", "..", "events.jsonl");
 const OFFSET = join(HERE, "..", "..", ".paper-offset");
+const TEST = !!process.env.PAPER_TEST; // set for harness runs: never touch the real log
 
 export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -34,7 +35,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("agent_settled", async () => {
-    if (!lastReplyText) return;
+    if (TEST || !lastReplyText) return;
     const text = lastReplyText;
     lastReplyText = null;
     await appendFile(
@@ -77,7 +78,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
-    if (!existsSync(LOG)) return; // not in the paper project
+    if (TEST || !existsSync(LOG)) return; // not in the paper project / harness
     timer = setInterval(tick, 1500);
     await tick();
     ctx.ui.notify("paper: watching events.jsonl", "info");
