@@ -95,7 +95,6 @@
           el.dataset.i = i;
           const label = document.createElement('span');
           label.className = 'label';
-          label.textContent = b.label ?? b.name ?? '';
           el.append(label);
           for (const c of ['nw', 'ne', 'sw', 'se']) {
             const h = document.createElement('div');
@@ -105,6 +104,9 @@
           }
           playground.append(el);
         }
+        // reproject EVERY render — a rename must reach an existing element's
+        // label, not just a freshly created one (found by makeprobe)
+        el.querySelector('.label').textContent = b.label ?? b.name ?? '';
         el.style.left = b.x + 'px';
         el.style.top = b.y + 'px';
         el.style.width = b.w + 'px';
@@ -422,6 +424,64 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         logEvent({ kind: 'edge', id: from + '>' + to + (commit ? ':' + commit : ''), from, to, label: commit });
     }
 
+    // ——— node creation & rename: the name ask (same contract as the verb ask) ———
+    // double-click empty playground = create; double-click a label pill = rename.
+    // Enter commits the node act, Escape/blur/click-away abandons. Rename re-emits
+    // the SAME id (latest node per id wins) — the label-arrow changes, the object
+    // doesn't: identity is the fold key, never the profile.
+    let nameAsk = null; // { mode: 'create'|'rename', id?, x?, y?, el }
+    function askName(mode, x, y, id, prefill) {
+      closeName(null); // one ask at a time
+      if (!playground) return;
+      const el = document.createElement('input');
+      el.className = 'verbin'; // same house style — it IS the same kind of ask
+      el.placeholder = mode === 'create' ? 'noun phrase?' : 'rename?';
+      el.value = prefill ?? '';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      playground.append(el);
+      el.focus();
+      el.select();
+      nameAsk = { mode, id, x, y, el };
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') closeName(el.value);
+        else if (ev.key === 'Escape') closeName(null);
+      });
+      el.addEventListener('blur', () => closeName(null));
+    }
+    function closeName(commit) {
+      if (!nameAsk) return;
+      const { mode, id, x, y, el } = nameAsk;
+      nameAsk = null;
+      el.remove();
+      if (commit === null || !commit.trim()) return; // empty = abandon
+      if (mode === 'create') {
+        const r4 = Math.random().toString(36).slice(2, 6);
+        logEvent({ kind: 'node', id: 'n_' + Date.now() + '_' + r4, label: commit.trim(), node_kind: 'object', geom: { x: Math.round(x), y: Math.round(y), w: 180, h: 56 } });
+      } else if (id) {
+        const b = boxes.find((v) => v.name === id);
+        logEvent({ kind: 'node', id, label: commit.trim(), node_kind: b?.kind });
+      }
+    }
+    plane.addEventListener('dblclick', (e) => {
+      if (!sketch || !playground || nameAsk || verbAsk) return;
+      // pointer capture retargets dblclick to the plane (the link gesture grabs
+      // capture on first click), so e.target lies — hit-test by coordinates
+      const hit = document.elementFromPoint(e.clientX, e.clientY);
+      if (!hit) return;
+      const pill = hit.closest('.label');
+      const boxEl = hit.closest('.box');
+      if (pill && boxEl) { // rename in place
+        const b = boxes[+boxEl.dataset.i];
+        if (!b) return;
+        askName('rename', b.x + b.w / 2, b.y + b.h / 2, b.name, b.label);
+      } else if (hit === playground) { // create at the click point
+        const r = playground.getBoundingClientRect();
+        askName('create', e.clientX - r.left, e.clientY - r.top, null, '');
+      }
+      // clicks on box bodies / handles / doc elements: not ours
+    });
+
     plane.addEventListener('pointerup', (e) => {
       if (link) { // drop on a box opens the verb ask; drop in space abandons
         const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.box');
@@ -577,7 +637,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     document.getElementById('fprev').addEventListener('click', () => switchFrame(frame - 1));
     document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
     document.addEventListener('keydown', (e) => {
-      if (e.target === t || e.target === verbAsk?.el) return; // typing in the chat bar or the verb ask
+      if (e.target === t || e.target === verbAsk?.el || e.target === nameAsk?.el) return; // typing in the chat bar or any inline ask
       if (e.key === 'ArrowLeft') switchFrame(frame - 1);
       if (e.key === 'ArrowRight') switchFrame(frame + 1);
     });
