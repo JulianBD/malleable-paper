@@ -14,3 +14,4 @@
 {"ts":"2026-09-20T06:33:21.669Z","kind":"human_message","text":"messaging from the web ui. and I said shift"}
 {"ts":"2026-09-20T06:33:27.698Z","kind":"human_message","text":"plus enter not just enter"}
 {"ts":"2026-09-20T06:34:01.398Z","kind":"agent_message","text":"Two things in that message: the loop test, and the correction — **shift**, not bare Enter. You said shift+enter and shift+plus; I made plain Enter send too, which overstepped. Fixing that, plus upgrading the mirror logic while I'm in there."}
+{"ts":"2026-09-20T06:39:00.000Z","kind":"agent_message","text":"Understood — send is shift+enter and shift+plus only; plain enter is a no-op in the chat bar now. Also upgraded the mirror: your reply is now the turn's final text (stashed per message, appended at agent_settled), so multi-step turns with tool calls won't mirror a mid-turn fragment. Reload once more — the next message you send should round-trip fully automatic, including this side."}
