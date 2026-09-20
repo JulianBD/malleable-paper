@@ -1,0 +1,85 @@
+{
+  "lexicon": 1,
+  "id": "paper.card",
+  "status": "draft",
+  "node": "#cardfield (frame 3, 'cards · what paper wants')",
+
+  "comment": "the adjudication widget: paper's intent presented on the plane as a form; Julian's ruling returns as an event. The first widget where BOTH directions of the data→infer→intend→act loop run through the log, with chat demoted to signpost.",
+
+  "events": {
+    "emits": {
+      "card": {
+        "type": "object",
+        "required": ["ts", "kind", "id", "title"],
+        "properties": {
+          "ts":     {"type": "string", "format": "datetime"},
+          "kind":   {"const": "card"},
+          "id":     {"type": "string", "comment": "fold key — latest card per id wins"},
+          "title":  {"type": "string"},
+          "status": {"enum": ["pending", "ruled"], "comment": "presentation hint only; a card_response overrides"},
+          "table":  {"type": "object", "properties": {
+            "columns": {"type": "array", "items": {"type": "string"}},
+            "rows":    {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+          }},
+          "form": {"type": "object", "properties": {
+            "fields": {"type": "array", "items": {"type": "object",
+              "required": ["ref", "options"],
+              "properties": {
+                "ref": {"type": "string"},
+                "options": {"type": "array", "items": {"type": "object",
+                  "required": ["k", "label"],
+                  "properties": {"k": {"type": "string"}, "label": {"type": "string"}}}}
+              }}}},
+            "writein": {"type": "boolean", "comment": "currently unconditional"}
+          }},
+          "note": {"type": "string"}
+        }
+      },
+      "card_response": {
+        "type": "object",
+        "required": ["ts", "kind", "card", "picks", "actor"],
+        "properties": {
+          "ts":    {"type": "string", "format": "datetime"},
+          "kind":  {"const": "card_response"},
+          "card":  {"type": "string", "comment": "the card id being ruled"},
+          "picks": {"type": "object", "additionalProperties": {"type": "string"}},
+          "note":  {"type": "string", "comment": "the write-in"},
+          "actor": {"type": "string"}
+        }
+      }
+    },
+    "consumes": ["card", "card_response"]
+  },
+
+  "domain": {
+    "fold": "latest card per id; latest card_response per card id",
+    "states": {
+      "pending": {"on": {"card_response[card=self]": "ruled"}},
+      "ruled":   {"on": {"card[id=self]": "pending", "comment": "re-posting the id reopens — supersede pattern"}}
+    },
+    "derives": {
+      "outstanding": "cards with no response — the 'what paper wants' list"
+    },
+    "intents": ["rule(picks, note)"],
+    "acts": {
+      "rule": {"event": "card_response", "guard": "card exists and is pending", "via": "POST /event from the card form"}
+    }
+  },
+
+  "system": {
+    "tick": "shared 2000ms chat poll (renderCards called per poll)",
+    "ingest": "extension steers card_response into session as '[card HH:MM:SS] ...' (requires /reload after 08:22 edit)"
+  },
+
+  "render": {
+    "element": "#cardfield",
+    "template": "bordered card: title, status badge, optional table, optional radio form + write-in textarea + 'rule it' button; ruled cards dim and show the ruling",
+    "ephemeral": ["radio selection before submit", "write-in draft"]
+  },
+
+  "knownGaps": [
+    "no card_delete / expiry — the T-form-probe test card renders forever (labeled 'ignore')",
+    "no agent-side notification beyond the extension steer; a ruled card while extension is unloaded is silent",
+    "writein flag declared in schema but render always shows the textarea"
+  ]
+}
