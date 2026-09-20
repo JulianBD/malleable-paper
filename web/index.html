@@ -227,6 +227,34 @@
       };
     }
 
+    // node inspector: right-click a node → its folded history inline (its
+    // own log + incident edge events), newest first. The history functor as
+    // a navigation gesture — every node carries its own explanation.
+    function showNodeLog(id) {
+      closeCheck();
+      const evs = latest.filter((v) =>
+        (v.kind === 'node' && v.id === id) ||
+        (v.kind === 'box_geometry' && v.name === id) ||
+        (v.kind === 'edge' && (v.from === id || v.to === id))).slice().reverse();
+      const el = document.createElement('pre');
+      el.className = 'checkpanel';
+      el.textContent = evs.length
+        ? evs.map((v) => JSON.stringify(v)).join('\n')
+        : 'no history — this node has no events';
+      playground.append(el);
+      checkPanel = { el };
+    }
+    plane.addEventListener('contextmenu', (e) => {
+      if (!sketch || !playground) return;
+      e.preventDefault();
+      const hit = document.elementFromPoint(e.clientX, e.clientY);
+      const boxEl = hit?.closest?.('.box');
+      if (boxEl) {
+        const b = boxes[+boxEl.dataset.i];
+        if (b) showNodeLog(b.name);
+      } else closeCheck();
+    });
+
     // check evidence: the history functor as error provenance — click a mark,
     // read the events that produced the offending structure
     function showCheck(edgeId) {

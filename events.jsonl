@@ -407,3 +407,35 @@
 {"ts":"2026-09-20T21:02:13.093Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
 {"ts":"2026-09-20T21:02:15.856Z","actor":"julian","kind":"edge","id":"n_1789938115932_ygsn>n-card","from":"n_1789938115932_ygsn","to":"n-card","label":""}
 {"ts":"2026-09-20T21:02:25.906Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":223,"w":200,"h":140}}
+{"ts":"2026-09-20T21:05:16.454Z","actor":"paper","kind":"node","id":"n_1789938115932_ygsn","label":"a renamed probe 15892","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:05:18.966Z","actor":"julian","kind":"node","id":"n_1789938318845_pxqr","label":"a doomed node 16183","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:05:21.727Z","actor":"julian","kind":"edge","id":"n-card>n_1789938318845_pxqr:is doomed by","from":"n-card","to":"n_1789938318845_pxqr","label":"is doomed by"}
+{"ts":"2026-09-20T21:05:24.489Z","actor":"julian","kind":"node","id":"n_1789938318845_pxqr","label":"a doomed node 16183","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:05:27.253Z","actor":"julian","kind":"edge","id":"n-card>n_1789938318845_pxqr:is doomed by","from":"n-card","to":"n_1789938318845_pxqr","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:05:34.285Z","actor":"julian","kind":"node","id":"n_1789938334066_jvie","label":"a probe node 34022","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:05:36.797Z","actor":"julian","kind":"node","id":"n_1789938334066_jvie","label":"a renamed probe 34022","node_kind":"object"}
+{"ts":"2026-09-20T21:05:44.332Z","actor":"julian","kind":"edge","id":"n-engine>n-domain:never interprets (probe 17:05:39)","from":"n-engine","to":"n-domain","label":"never interprets (probe 17:05:39)"}
+{"ts":"2026-09-20T21:05:51.369Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T21:05:54.131Z","actor":"julian","kind":"edge","id":"n_1789938334066_jvie>n-card","from":"n_1789938334066_jvie","to":"n-card","label":""}
+{"ts":"2026-09-20T21:06:04.180Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":223,"w":200,"h":140}}
+{"ts":"2026-09-20T21:06:15.233Z","actor":"paper","kind":"node","id":"n_1789938334066_jvie","label":"a renamed probe 34022","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:06:15.233Z","actor":"paper","kind":"edge","id":"n_1789938115932_ygsn>n-card","from":"n_1789938115932_ygsn","to":"n-card","label":"","superseded":true}
+{"ts":"2026-09-20T21:06:17.744Z","actor":"julian","kind":"node","id":"n_1789938377735_aaqa","label":"a doomed node 75049","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:06:20.761Z","actor":"julian","kind":"edge","id":"n-card>n_1789938377735_aaqa:is doomed by","from":"n-card","to":"n_1789938377735_aaqa","label":"is doomed by"}
+{"ts":"2026-09-20T21:06:23.522Z","actor":"julian","kind":"node","id":"n_1789938377735_aaqa","label":"a doomed node 75049","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:06:26.283Z","actor":"julian","kind":"edge","id":"n-card>n_1789938377735_aaqa:is doomed by","from":"n-card","to":"n_1789938377735_aaqa","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:07:40.408Z","actor":"paper","kind":"edge","id":"n_1789938334066_jvie>n-card","from":"n_1789938334066_jvie","to":"n-card","label":"","superseded":true}
+{"ts":"2026-09-20T21:07:45.683Z","actor":"julian","kind":"node","id":"n_1789938465613_1fny","label":"a doomed node 60314","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:07:48.444Z","actor":"julian","kind":"edge","id":"n-card>n_1789938465613_1fny:is doomed by","from":"n-card","to":"n_1789938465613_1fny","label":"is doomed by"}
+{"ts":"2026-09-20T21:07:51.207Z","actor":"julian","kind":"node","id":"n_1789938465613_1fny","label":"a doomed node 60314","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:07:54.221Z","actor":"julian","kind":"edge","id":"n-card>n_1789938465613_1fny:is doomed by","from":"n-card","to":"n_1789938465613_1fny","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:08:16.331Z","actor":"julian","kind":"node","id":"n_1789938496160_7793","label":"a doomed node 93496","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:08:19.095Z","actor":"julian","kind":"edge","id":"n-card>n_1789938496160_7793:is doomed by","from":"n-card","to":"n_1789938496160_7793","label":"is doomed by"}
+{"ts":"2026-09-20T21:08:21.858Z","actor":"julian","kind":"node","id":"n_1789938496160_7793","label":"a doomed node 93496","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:08:24.625Z","actor":"julian","kind":"edge","id":"n-card>n_1789938496160_7793:is doomed by","from":"n-card","to":"n_1789938496160_7793","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:08:31.405Z","actor":"julian","kind":"node","id":"n_1789938511337_mfib","label":"a probe node 11293","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:08:34.169Z","actor":"julian","kind":"node","id":"n_1789938511337_mfib","label":"a renamed probe 11293","node_kind":"object"}
+{"ts":"2026-09-20T21:08:41.456Z","actor":"julian","kind":"edge","id":"n-engine>n-domain:never interprets (probe 17:08:37)","from":"n-engine","to":"n-domain","label":"never interprets (probe 17:08:37)"}
+{"ts":"2026-09-20T21:08:48.490Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":249,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T21:08:51.253Z","actor":"julian","kind":"edge","id":"n_1789938511337_mfib>n-card","from":"n_1789938511337_mfib","to":"n-card","label":""}
+{"ts":"2026-09-20T21:09:01.554Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":223,"w":200,"h":140}}

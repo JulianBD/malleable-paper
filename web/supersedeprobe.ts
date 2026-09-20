@@ -25,29 +25,35 @@ const pg = await page.locator("#playground").boundingBox();
 
 // (see pre-clean block below — it needs a poll cycle before the plane is clear)
 
-// self-cleaning: supersede every probe-labeled node (doomed/scaffold/probe)
-// and any dangling edges — supersede made the old parking workaround obsolete
+// self-cleaning, to a FIXPOINT: supersede every probe-labeled node
+// (doomed/scaffold/probe) and any dangling edges. One pass is not enough —
+// superseding a node makes its incident edges dangle, and the edge scan
+// can't see acts still in the drain queue; loop until a pass makes no acts.
 {
-  const evs = await (await fetch(URL + "/events")).json();
-  const nodes = new Map();
-  for (const e of evs) if (e.kind === "node" && e.id) nodes.set(e.id, e);
-  for (const e of nodes.values()) {
-    if (e.superseded || !/probe|scaffold|doomed/i.test(e.label ?? "")) continue;
-    await fetch(URL + "/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "paper", kind: "node", id: e.id, label: e.label, node_kind: e.node_kind, superseded: true }) });
-    console.log("pre-clean: superseded node", e.id, e.label);
-  }
-  const evs2 = await (await fetch(URL + "/events")).json();
-  const nodes2 = new Map();
-  for (const e of evs2) if (e.kind === "node" && e.id) nodes2.set(e.id, e);
-  const edg = new Map();
-  for (const e of evs2) if (e.kind === "edge" && e.id) edg.set(e.id, e);
-  for (const e of edg.values()) {
-    if (e.superseded) continue;
-    const f = nodes2.get(e.from), t2 = nodes2.get(e.to);
-    if ((f && f.superseded) || (t2 && t2.superseded) || !f || !t2) {
-      await fetch(URL + "/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "paper", kind: "edge", id: e.id, from: e.from, to: e.to, label: e.label, superseded: true }) });
-      console.log("pre-clean: superseded dangling", e.id);
+  for (let round = 0; round < 4; round++) {
+    const evs = await (await fetch(URL + "/events")).json();
+    const nodes = new Map();
+    for (const e of evs) if (e.kind === "node" && e.id) nodes.set(e.id, e);
+    const edg = new Map();
+    for (const e of evs) if (e.kind === "edge" && e.id) edg.set(e.id, e);
+    let acts = 0;
+    for (const e of nodes.values()) {
+      if (e.superseded || !/probe|scaffold|doomed/i.test(e.label ?? "")) continue;
+      await fetch(URL + "/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "paper", kind: "node", id: e.id, label: e.label, node_kind: e.node_kind, superseded: true }) });
+      console.log("pre-clean: superseded node", e.id, e.label);
+      acts++;
     }
+    for (const e of edg.values()) {
+      if (e.superseded) continue;
+      const f = nodes.get(e.from), t2 = nodes.get(e.to);
+      if ((f && f.superseded) || (t2 && t2.superseded) || !f || !t2) {
+        await fetch(URL + "/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "paper", kind: "edge", id: e.id, from: e.from, to: e.to, label: e.label, superseded: true }) });
+        console.log("pre-clean: superseded dangling", e.id);
+        acts++;
+      }
+    }
+    if (!acts) break;
+    await new Promise((r) => setTimeout(r, 2600)); // drain + poll before re-scan
   }
 }
 await page.waitForTimeout(2600); // let the poll fold the pre-clean supersedes in
