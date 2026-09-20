@@ -19,24 +19,22 @@ const OFFSET = join(HERE, "..", "..", ".paper-offset");
 export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let offset = -1;
-  // set when a browser message was delivered; the turn's last assistant
-  // text is mirrored to the log as an agent_message once the agent settles
-  let replyOwed = false;
+  // every turn's last assistant text is mirrored to the log at settle —
+  // the browser is the primary view; subagent-triggered turns must land too
   let lastReplyText: string | null = null;
 
   pi.on("message_end", async (event) => {
-    if (event.message.role !== "assistant" || !replyOwed) return;
+    if (event.message.role !== "assistant") return;
     const parts = Array.isArray(event.message.content)
       ? event.message.content.filter((p: any) => p.type === "text" && p.text?.trim())
       : [];
-    if (parts.length === 0) return; // tool-call only, reply still owed
+    if (parts.length === 0) return; // tool-call only
     // stash (not append): later text in the same turn supersedes earlier
     lastReplyText = parts.map((p: any) => p.text).join("\n\n").trim();
   });
 
   pi.on("agent_settled", async () => {
-    if (!replyOwed || !lastReplyText) return;
-    replyOwed = false;
+    if (!lastReplyText) return;
     const text = lastReplyText;
     lastReplyText = null;
     await appendFile(
@@ -67,7 +65,6 @@ export default function (pi: ExtensionAPI) {
       if (e.kind !== "human_message") continue;
       const stamp = e.ts?.slice(11, 19) ?? "";
       const text = `[browser ${stamp}] ${e.text}`;
-      replyOwed = true;
       try {
         pi.sendUserMessage(text, { deliverAs: "steer" });
       } catch {
