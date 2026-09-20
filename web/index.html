@@ -266,7 +266,7 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
     let recording = false;
     async function logEvent(ev) {
       try {
-        await fetch('/event', {
+        await fetch('/act', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ actor: 'julian', ...ev }),
@@ -528,7 +528,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           }
           const note = formEl.querySelector('textarea').value.trim();
           const final = ev.submitter?.dataset.final !== '0';
-          await fetch('/event', {
+          await fetch('/act', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ kind: 'card_response', card: c.id, picks, note, final, actor: 'julian' }),
@@ -539,17 +539,18 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
       }
     }
 
-    let seen = -1;
+    let cursor = 0;
     async function poll() {
       try {
-        const events = await (await fetch('/events')).json();
-        if (events.length > seen) {
-          latest = events;
+        const r = await (await fetch('/events?since=' + cursor)).json();
+        const fresh = r.events;
+        cursor = r.cursor;
+        if (fresh.length) {
+          latest = latest.concat(fresh);
           renderCards();
           const wasBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-          seen = events.length;
           log.innerHTML = '';
-          for (const e of events) {
+          for (const e of latest) {
             if (e.kind !== 'human_message' && e.kind !== 'agent_message') continue;
             const p = document.createElement('p');
             p.className = 'msg ' + (e.kind === 'agent_message' ? 'agent' : 'human');

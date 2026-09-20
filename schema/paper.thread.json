@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "paper.thread",
+  "status": "draft",
+  "node": "none yet — log-only until a threads frame exists",
+  "comment": "open questions and design flags. First instance: T-typed-reasoning (design reasoning in typed media, prose as commentary).",
+  "events": {
+    "emits": {
+      "thread": {
+        "type": "object",
+        "required": ["ts", "kind", "id", "title"],
+        "properties": {
+          "ts":    {"type": "string", "format": "datetime"},
+          "kind":  {"const": "thread"},
+          "id":    {"type": "string"},
+          "title": {"type": "string"},
+          "body":  {"type": "string"},
+          "status": {"enum": ["open", "closed"]}
+        }
+      }
+    },
+    "consumes": ["thread"]
+  },
+  "domain": {
+    "fold": "latest thread per id",
+    "states": {"open": {"on": {"thread[id=self, status=closed]": "closed"}}, "closed": {"on": {}}},
+    "intents": ["raise", "close"],
+    "acts": {"raise": {"event": "thread", "via": "POST /act"}}
+  },
+  "system": {"tick": "none"},
+  "render": {"element": null, "template": "unrendered — candidate: a threads frame or card overlay", "ephemeral": []}
+}

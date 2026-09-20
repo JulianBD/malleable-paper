@@ -1,70 +1,138 @@
-// malleable-paper v0: serves the input page and appends messages to the
-// authoritative event log. The log is the tool; this server is a projection
-// of nothing yet — just the thinnest pipe from browser to disk.
+// malleable-paper v0: serves the paper and owns the event log.
+//
+// The engine machine, smallest honest version (built by use, 13:4x):
+// ALL intake goes through one act queue. Producers register acts
+// (POST /act, /event, /message — the latter two are compat shims that
+// enqueue). A drain tick validates each act against the lexicon
+// registry (schema/*.json: known kind, required fields present),
+// stamps commit-time ts, and appends the batch to events.jsonl.
+// Readers use GET /events?since=N — {events, cursor} — instead of
+// re-reading the whole log.
 //
 //   bun run web/server.ts   → http://localhost:5174
 
-import { appendFile } from "node:fs/promises";
+import { appendFile, readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const LOG = join(root, "..", "events.jsonl");
+const SCHEMA = join(root, "..", "schema");
+const DRAIN_MS = 250;
+
+// ——— lexicon registry: kind → required fields (the intake contract) ———
+async function loadRegistry() {
+  const registry = new Map();
+  try {
+    for (const f of await readdir(SCHEMA)) {
+      if (!f.endsWith(".json")) continue;
+      try {
+        const lex = JSON.parse(await readFile(join(SCHEMA, f), "utf8"));
+        for (const [kind, spec] of Object.entries(lex?.events?.emits ?? {})) {
+          if (kind && typeof spec === "object" && !Array.isArray(spec))
+            registry.set(kind, spec.required ?? []);
+        }
+      } catch (e) {
+        console.warn(`schema ${f} failed to parse: ${e.message}`);
+      }
+    }
+  } catch {}
+  return registry;
+}
+let registry = await loadRegistry();
+console.log(`lexicon registry: ${[...registry.keys()].sort().join(", ")}`);
 
 async function readEvents() {
   try {
     const raw = await Bun.file(LOG).text();
     return raw.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
   } catch {
-    return []; // no log yet
+    return [];
   }
 }
+
+// ——— the queue ———
+let queue = []; // acts registered between drains
+const rejects = []; // validation failures, surfaced via /queue for debugging
+
+function enqueue(act) {
+  queue.push(act);
+  return queue.length; // position hint, not a cursor
+}
+
+async function drain() {
+  if (!queue.length) return;
+  const batch = queue;
+  queue = [];
+  const lines = [];
+  for (const act of batch) {
+    const required = registry.get(act.kind);
+    if (!required) {
+      rejects.push({ act, why: `unknown kind '${act.kind}' — no lexicon emits it`, ts: new Date().toISOString() });
+      continue;
+    }
+    const missing = required.filter((f) => act[f] === undefined && f !== "ts");
+    if (missing.length) {
+      rejects.push({ act, why: `missing required: ${missing.join(", ")}`, ts: new Date().toISOString() });
+      continue;
+    }
+    lines.push(JSON.stringify({ ts: new Date().toISOString(), ...act }));
+  }
+  if (lines.length) await appendFile(LOG, lines.join("\n") + "\n");
+  if (rejects.length > 20) rejects.splice(0, rejects.length - 20);
+}
+setInterval(drain, DRAIN_MS);
 
 const server = Bun.serve({
   port: 5174,
   async fetch(req) {
     const url = new URL(req.url);
+
     if (req.method === "GET" && url.pathname === "/events") {
-      return Response.json(await readEvents());
+      const events = await readEvents();
+      const since = url.searchParams.get("since");
+      if (since !== null) {
+        const n = Math.max(0, parseInt(since) || 0);
+        return Response.json({ events: events.slice(n), cursor: events.length });
+      }
+      return Response.json(events); // legacy full-array shape
     }
+
+    if (req.method === "GET" && url.pathname === "/queue") {
+      return Response.json({ pending: queue.length, rejects, kinds: [...registry.keys()].sort() });
+    }
+
+    // canonical intake
+    if (req.method === "POST" && url.pathname === "/act") {
+      let body;
+      try { body = await req.json(); } catch { return new Response("invalid json", { status: 400 }); }
+      if (typeof body.kind !== "string" || !body.kind) return new Response("kind required", { status: 400 });
+      return Response.json({ ok: true, position: enqueue(body) });
+    }
+
+    // compat shims — both enqueue; /message supplies the human_message envelope
     if (req.method === "POST" && url.pathname === "/event") {
-      let body: Record<string, unknown>;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response("invalid json", { status: 400 });
-      }
-      if (typeof body.kind !== "string" || !body.kind) {
-        return new Response("kind required", { status: 400 });
-      }
-      const event = { ts: new Date().toISOString(), ...body };
-      await appendFile(LOG, JSON.stringify(event) + "\n");
-      return Response.json({ ok: true });
+      let body;
+      try { body = await req.json(); } catch { return new Response("invalid json", { status: 400 }); }
+      if (typeof body.kind !== "string" || !body.kind) return new Response("kind required", { status: 400 });
+      return Response.json({ ok: true, position: enqueue(body) });
     }
     if (req.method === "POST" && url.pathname === "/message") {
-      let body: { text?: unknown };
-      try {
-        body = await req.json();
-      } catch {
-        return new Response("invalid json", { status: 400 });
-      }
-      if (typeof body.text !== "string" || body.text.trim() === "") {
-        return new Response("text required", { status: 400 });
-      }
-      const event = {
-        ts: new Date().toISOString(),
-        kind: "human_message",
-        // R1 (ruled 13:35): message ids; R2: actor everywhere
-        id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
-        actor: "human",
-        text: body.text,
-      };
-      await appendFile(LOG, JSON.stringify(event) + "\n");
-      return Response.json({ ok: true });
+      let body;
+      try { body = await req.json(); } catch { return new Response("invalid json", { status: 400 }); }
+      if (typeof body.text !== "string" || body.text.trim() === "") return new Response("text required", { status: 400 });
+      // R1 (ruled 13:35): message ids; R2: actor everywhere
+      return Response.json({
+        ok: true,
+        position: enqueue({
+          kind: "human_message",
+          id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          actor: "human",
+          text: body.text,
+        }),
+      });
     }
-    if (req.method === "GET" && url.pathname === "/events") {
-      return Response.json(await readEvents());
-    }
+
     // static assets from web/ (index.html, house.css, …)
     if (req.method === "GET") {
       const safe = url.pathname.replace(/^\/+/, "");
@@ -72,13 +140,11 @@ const server = Bun.serve({
         const file = Bun.file(join(root, safe));
         if (await file.exists()) return new Response(file);
       }
-      if (url.pathname === "/") {
-        return new Response(Bun.file(join(root, "index.html")));
-      }
+      if (url.pathname === "/") return new Response(Bun.file(join(root, "index.html")));
     }
     return new Response("not found", { status: 404 });
   },
 });
 
 console.log(`malleable-paper listening on http://localhost:${server.port}`);
-console.log(`event log: ${LOG}`);
+console.log(`event log: ${LOG} · drain every ${DRAIN_MS}ms`);
