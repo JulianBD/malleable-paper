@@ -1,113 +1,66 @@
-// web/lisp.ts — the scripting layer, now with reading.
-// Programs are enqueued as {kind:"eval", program:"…"}; the drain evaluates
-// them against the LIVE LOG, so acts can be conditional on state:
+// web/lisp.ts — the FFI floor between the paper's Scheme (LIPS) and JS.
 //
-//   (if (pending-cards)
-//       (frame "F-attn" :title "…" :body "…"))
+// Everything mechanical lives here and ONLY here: parsing/eval (LIPS),
+// event emission, log folds, string concat. The language above the floor —
+// stdlib.scm and every program queued as {kind:"eval"} — is portable
+// Scheme. Swap the host (browser DOM → filesystem → anything) by
+// re-binding this file's functions; the programs don't change.
 //
-// Reader forms fold the log inside the evaluator; writer prims expand to
-// events that join the same drain and pass normal lexicon validation.
-// The log stays pure events — programs are how acts arrive.
+// Writers take positional args: (frame "F-id" "title" "markdown body").
+// Readers return LIPS values (lists as Pairs) so Scheme predicates work.
 
-export type SExp = string | number | SExp[];
+import lips from "@jcubic/lips";
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-export function parse(src: string): SExp[] {
-  const toks = src.match(/"(?:[^"\\]|\\.)*"|[()]|[^\s()]+/g) ?? [];
-  let i = 0;
-  function read(): SExp {
-    const t = toks[i++];
-    if (t === "(") {
-      const list: SExp[] = [];
-      while (toks[i] !== ")") {
-        if (i >= toks.length) throw new Error("unclosed (");
-        list.push(read());
-      }
-      i++;
-      return list;
-    }
-    if (t === ")") throw new Error("unexpected )");
-    if (t.startsWith('"')) return JSON.parse(t);
-    if (t !== "" && !isNaN(Number(t))) return Number(t);
-    return t; // symbol or :keyword
-  }
-  const out: SExp[] = [];
-  while (i < toks.length) out.push(read());
-  return out;
+const STDLIB = join(dirname(fileURLToPath(import.meta.url)), "stdlib.scm");
+let stdlibCache: string | null = null;
+async function stdlib(): Promise<string> {
+  if (stdlibCache === null) stdlibCache = await readFile(STDLIB, "utf8");
+  return stdlibCache;
 }
-
-function kws(args: SExp[]): Record<string, string> {
-  const o: Record<string, string> = {};
-  for (let i = 0; i < args.length; i += 2) {
-    const k = args[i];
-    if (typeof k !== "string" || !k.startsWith(":")) throw new Error("expected :keyword, got " + JSON.stringify(k));
-    const v = args[i + 1];
-    if (typeof v !== "string") throw new Error("expected string value for " + k);
-    o[k.slice(1)] = v;
-  }
-  return o;
-}
+export function invalidateStdlib() { stdlibCache = null; }
 
 type Ev = Record<string, any>;
+const S = (x: unknown): string => String(x); // LIPS strings are LString objects
 
-// truthiness: false, 0, "", and the empty list are false; all else true.
-const truthy = (v: unknown) => v !== false && v !== 0 && v !== "" && !(Array.isArray(v) && v.length === 0);
-
-export function evaluate(program: string, actor: string, log: Ev[]): Ev[] {
+export async function evaluate(program: string, actor: string, log: Ev[]): Promise<Ev[]> {
   const emitted: Ev[] = [];
+  const push = (kind: string, fields: Ev) => emitted.push({ kind, actor, ...fields });
 
-  // ——— readers: folds over the log, available inside programs ———
+  // ——— readers: folds over the log ———
   const pendingCards = (): string[] => {
-    const cards = new Map<string, Ev>(), ruled = new Set<string>();
+    const ruled = new Set<string>(), cards = new Set<string>();
     for (const e of log) {
-      if (e.kind === "card") cards.set(e.id, e);
+      if (e.kind === "card") cards.add(e.id);
       if (e.kind === "card_response" && e.final === true) ruled.add(e.card);
     }
-    return [...cards.keys()].filter((id) => !ruled.has(id));
+    return [...cards].filter((id) => !ruled.has(id));
   };
 
-  const readers: Record<string, (args: SExp[]) => unknown> = {
-    // (count "kind") → number of events of that kind
-    count: ([k]) => log.filter((e) => e.kind === k).length,
-    // (pending-cards) → list of unrul​ed card ids
-    "pending-cards": () => pendingCards(),
-    // (last-field "kind" "field") → field of the latest event of kind
-    "last-field": ([k, f]) => {
-      const es = log.filter((e) => e.kind === k);
-      return es.length ? es[es.length - 1]?.[String(f)] : "";
+  // ——— the FFI floor: every host binding, in one place ———
+  const floor = {
+    // writers (emit events into the same drain batch)
+    frame: (id: unknown, title: unknown, body: unknown) => { push("frame_def", { id: S(id), title: S(title), body: S(body) }); },
+    card: (id: unknown, title: unknown, blurb: unknown) => { push("card", { id: S(id), title: S(title), blurb: S(blurb) }); },
+    // readers
+    count: (kind: unknown) => log.filter((e) => e.kind === S(kind)).length,
+    "pending-cards": () => lips.Pair.fromArray(pendingCards()),
+    "last-field": (kind: unknown, field: unknown) => {
+      const es = log.filter((e) => e.kind === S(kind));
+      const v = es.length ? es[es.length - 1]?.[S(field)] : undefined;
+      return v === undefined ? "" : (typeof v === "object" ? JSON.stringify(v) : v);
     },
+    // string primitive our prelude builds on (JS concat; host-level)
+    concat: (...xs: unknown[]) => xs.map(S).join(""),
   };
 
-  const writers: Record<string, (id: string, rest: SExp[]) => void> = {
-    frame: (id, rest) => emitted.push({ kind: "frame_def", id, ...kws(rest) }),
-    card: (id, rest) => emitted.push({ kind: "card", id, ...kws(rest) }),
-  };
-
-  function evalExpr(x: SExp): unknown {
-    if (!Array.isArray(x)) return x; // literals & keywords evaluate to themselves
-    const [head, ...args] = x;
-    if (typeof head !== "string") throw new Error("form head must be a symbol");
-    if (head === "if") {
-      const [test, then, els] = args;
-      return truthy(evalExpr(test)) ? evalExpr(then) : els !== undefined ? evalExpr(els) : false;
-    }
-    if (head === "=") return evalExpr(args[0]) === evalExpr(args[1]);
-    if (head === ">") return Number(evalExpr(args[0])) > Number(evalExpr(args[1]));
-    if (head === "str") return args.map((a) => String(evalExpr(a))).join("");
-    if (head in readers) return readers[head](args.map((a) => evalExpr(a)) as SExp[]);
-    if (head in writers) {
-      const id = evalExpr(args[0]);
-      if (typeof id !== "string") throw new Error(head + ": first arg must be the target id");
-      // keyword args may be computed: (frame (str "F-" 1) :body (str …))
-      const rest: SExp[] = [];
-      for (let i = 1; i < args.length; i += 2) {
-        rest.push(args[i] as SExp, String(evalExpr(args[i + 1])));
-      }
-      writers[head](id, rest);
-      return id;
-    }
-    throw new Error(`unknown form '${head}' — vocabulary: if = > str ${Object.keys(readers).join(" ")} ${Object.keys(writers).join(" ")}`);
+  const env = new lips.Environment(floor as any, lips.global_environment);
+  try {
+    await lips.exec((await stdlib()) + "\n" + program, env);
+  } catch (e: any) {
+    throw new Error(`eval failed: ${e.message}`);
   }
-
-  for (const form of parse(program)) evalExpr(form);
-  return emitted.map((e) => ({ actor, ...e }));
+  return emitted;
 }

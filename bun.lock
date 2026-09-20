@@ -1,0 +1,16 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "@jcubic/lips": "^0.20.3",
+      },
+    },
+  },
+  "packages": {
+    "@jcubic/lips": ["@jcubic/lips@0.20.3", "", { "dependencies": { "bn.js": "^4.11.8" }, "bin": { "lips": "bin/lips.js" } }, "sha512-4DQ8t79F1aBjaDHb2UVwSFJe+OWReruGhmXr1X+qWc2htf5Xd3hEM8MO5Ynm/faw9HyqrCJAs92IBrWTyhBJTw=="],
+
+    "bn.js": ["bn.js@4.12.5", "", {}, "sha512-3aRg6/JxfffFD+OlOjOFR3Vo79l39ooBTFucxx+MT3dhCtzn3EmiUPQo+6/OZuI2jbXi3YKgmiTFBgChQMwIRQ=="],
+  }
+}
