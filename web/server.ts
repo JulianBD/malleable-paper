@@ -45,8 +45,19 @@ const server = Bun.serve({
       await appendFile(LOG, JSON.stringify(event) + "\n");
       return Response.json({ ok: true });
     }
-    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-      return new Response(Bun.file(join(root, "index.html")));
+    if (req.method === "GET" && url.pathname === "/events") {
+      return Response.json(await readEvents());
+    }
+    // static assets from web/ (index.html, house.css, …)
+    if (req.method === "GET") {
+      const safe = url.pathname.replace(/^\/+/, "");
+      if (safe && !safe.includes("..")) {
+        const file = Bun.file(join(root, safe));
+        if (await file.exists()) return new Response(file);
+      }
+      if (url.pathname === "/") {
+        return new Response(Bun.file(join(root, "index.html")));
+      }
     }
     return new Response("not found", { status: 404 });
   },

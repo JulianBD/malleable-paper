@@ -1,0 +1,134 @@
+/* house.css — the wireframe house style, v0
+ *
+ * Every semantic element gets a visible 1px black outline and a tiny
+ * uppercase tag label, so the page reads as its own structure diagram.
+ * Monochrome. No colors, no shadows, no radii. This file is the seed of
+ * the UI lib: components get built on top of it, never around it.
+ */
+
+main, footer, section, article, nav, aside,
+form, output, ol, ul, figure, dialog {
+  position: relative;
+  outline: 1px solid #000;
+}
+
+main::before, footer::before, section::before, article::before,
+nav::before, aside::before, form::before, output::before,
+ol::before, ul::before, figure::before, dialog::before {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  transform: translateY(-100%);
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #000;
+  background: #fff;
+  padding: 1px 3px 0;
+  content: "element"; /* overridden per-tag below */
+}
+
+main::before     { content: "main"; }
+footer::before   { content: "footer"; }
+section::before  { content: "section"; }
+article::before  { content: "article"; }
+nav::before      { content: "nav"; }
+aside::before    { content: "aside"; }
+form::before     { content: "form"; }
+output::before   { content: "output"; }
+ol::before       { content: "ol"; }
+ul::before       { content: "ul"; }
+figure::before   { content: "figure"; }
+dialog::before   { content: "dialog"; }
+
+/* interactive elements keep the rectangle language, no label */
+textarea, input, button {
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  font: inherit;
+}
+
+/* page furniture */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #fff;
+  color: #000;
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 8px;
+}
+main > textarea {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: none;
+  padding: 24px;
+  font-size: 17px;
+  line-height: 1.7;
+}
+main > textarea:focus { outline: 2px solid #000; outline-offset: -2px; }
+main > textarea::placeholder { color: #bbb; }
+
+footer {
+  margin: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+}
+output {
+  display: block;
+  max-height: 0;
+  overflow-y: auto;
+  transition: max-height .25s ease;
+  padding: 0 12px;
+}
+footer.open output {
+  max-height: 36vh;
+  padding: 10px 12px;
+}
+output p {
+  margin: 2px 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.5;
+}
+output p .who { font-weight: 600; margin-right: 8px; }
+output p.human .who::after { content: " · julian"; font-weight: 400; }
+output p .ts { font-size: 11px; color: #666; margin-left: 8px; }
+
+form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  align-items: center;
+}
+form input {
+  flex: 1;
+  padding: 8px 12px;
+}
+form input:focus { outline: 2px solid #000; outline-offset: -1px; }
+form button {
+  padding: 8px 16px;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+}
+form button:disabled { background: #666; border-color: #666; cursor: default; }
+form button.toggle {
+  background: #fff;
+  color: #000;
+  white-space: nowrap;
+}
+form .status { font-size: 12px; color: #666; min-width: 3em; text-align: right; }
