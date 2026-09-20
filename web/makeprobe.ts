@@ -26,10 +26,38 @@ const stamp = Date.now() % 100000;
 const NAME = "a probe node " + stamp;
 const RENAME = "a renamed probe " + stamp;
 
-// (a) create: double-click a clear spot mid-plane (not near an edge —
-// nodes overflow the playground bottom and clicks then miss the pill)
+// self-clean (supersede made it possible): fold away leftover probe nodes
+// from earlier runs — the plane is live and multi-writer, strays accumulate
+{
+  const evs = await (await fetch(URL + "/events")).json();
+  const nodes = new Map();
+  for (const e of evs) if (e.kind === "node" && e.id) nodes.set(e.id, e);
+  for (const e of nodes.values()) {
+    if (e.superseded || !/probe/i.test(e.label ?? "")) continue;
+    await fetch(URL + "/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "paper", kind: "node", id: e.id, label: e.label, node_kind: e.node_kind, superseded: true }) });
+    console.log("pre-clean: superseded node", e.id, e.label);
+  }
+  await page.waitForTimeout(2600);
+}
+
+// (a) create: double-click a CLEAR spot — the layout is live (Julian drags
+// nodes while probes run; a hardcoded spot got covered by 'the graph' and
+// the ask never opened). Scan for space no box or mark owns.
 const pg = await page.locator("#playground").boundingBox();
-await page.mouse.dblclick(pg.x + pg.width * 0.85, pg.y + pg.height * 0.35);
+async function clearSpot() {
+  for (const fx of [0.85, 0.7, 0.9, 0.5, 0.3, 0.6, 0.8]) for (const fy of [0.35, 0.6, 0.25, 0.75, 0.45]) {
+    const x = pg.x + pg.width * fx, y = pg.y + pg.height * fy;
+    const clear = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return el && !el.closest(".box, .badge, .checkpanel, .verbin") && !el.closest("#edgelay");
+    }, [x, y]);
+    if (clear) return [x, y];
+  }
+  return null;
+}
+const spot = await clearSpot();
+if (!spot) { console.log("FAIL — no clear space on a crowded plane"); await browser.close(); process.exit(1); }
+await page.mouse.dblclick(spot[0], spot[1]);
 const ask = page.locator(".verbin");
 console.log("create ask visible:", await ask.count() === 1);
 await ask.fill(NAME);
@@ -66,7 +94,8 @@ const identity = createAct && renameAct && createAct.id === renameAct.id;
 
 // (d) abandon path: open the ask, Escape — no act, nothing new on plane
 const before = await page.locator("#playground .box").count();
-await page.mouse.dblclick(pg.x + pg.width * 0.6, pg.y + 40);
+const spot2 = await clearSpot();
+await page.mouse.dblclick(spot2[0], spot2[1]);
 await page.locator(".verbin").press("Escape");
 await page.waitForTimeout(300);
 const afterEscape = await page.locator("#playground .box").count();

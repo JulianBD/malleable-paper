@@ -441,3 +441,67 @@
 {"ts":"2026-09-20T21:09:01.554Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":58,"y":223,"w":200,"h":140}}
 {"ts":"2026-09-20T21:09:11.860Z","kind":"thread","id":"T-supersede-cascade","title":"ruling · supersede never cascades — dangling marks are the question","status":"closed","tags":["olog","supersede","design"],"body":"Superseding a node does NOT auto-supersede its incident edges. The edges dangle visibly (dashed stub + badge) and ask for a ruling — each supersede is an explicit act. Consequence for batch cleanup (probes, future linters): iterate supersede passes to a fixpoint, since each node-supersede creates new dangling edges that a prior edge scan could not see. Probe lesson recorded in supersedeprobe pre-clean."}
 {"ts":"2026-09-20T21:09:20.904Z","kind":"thread","id":"T-olog-widget-progress","title":"progress · olog designer widget build — units 1-7 landed","status":"open","tags":["progress","olog","widget"],"body":"Landed through unit 7: 1 verb ask (7ec8398), 2+3 create/rename in place (99da87c), 4+5 supersede + dangling/bare/ambiguity checks with evidence panels (eafa382), 6 path-to-sentence strip — clicking connected edges composes the prose reading, chain-break restarts, Escape clears; the reading IS the composition check (017e20f), 7 node inspector — right-click shows folded history (node + geometry + incident edges) newest-first (5eb9769). Design rulings logged: T-supersede-cascade (supersede never auto-cascades; dangling = a question; batch cleanup iterates to fixpoint). Gotchas discovered: pointerup deselect-and-rebuild destroys the edge hit-line under the pointer before its click fires (edge-ups in #edgelay defer to click handler); edges render under boxes so crossing stretches are unclickable (probes sample the line for exposed points via elementFromPoint); labels compose verbatim (already noun phrases). REMAINING: 8 incremental folds (keyed-merge state maps, apply fresh letters only — the monoid refactor), 9 ephemeral pan/zoom. Eight probes green: probe, hydraprobe, sketchprobe, verbprobe, makeprobe, supersedeprobe, pathprobe, inspectorprobe — run each with bun web/<name>.ts. Subagent channel still unreliable; main session implements."}
+{"ts":"2026-09-20T21:09:31.198Z","kind":"agent_message","id":"m_1789938571033_1xcc","actor":"agent","text":"**My candidate: do 9 (pan/zoom) first.** It's ephemeral gesture work — small, isolated, probe-able — while 8 is the monoid refactor of the fold core (keyed-merge state maps, fresh-letters-only application) and touches everything, best done with a fresh context window against a committed green baseline. Counterpoint worth weighing: 9's gesture layer will need to re-project through whatever fold state exists, so refactoring first avoids rework — but the projections are coordinate-local, so I think the churn risk is low either way. Your call, or just say proceed and I'll take 9 then 8 in the next session."}
+{"ts":"2026-09-20T21:13:23.752Z","actor":"julian","kind":"box_geometry","name":"B","geom":{"x":305,"y":73,"w":200,"h":140}}
+{"ts":"2026-09-20T21:13:24.754Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":0,"y":92,"w":200,"h":140}}
+{"ts":"2026-09-20T21:14:32.821Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":216,"y":475,"w":160,"h":56}}
+{"ts":"2026-09-20T21:14:34.829Z","actor":"julian","kind":"box_geometry","name":"n-act","geom":{"x":605,"y":489,"w":120,"h":48}}
+{"ts":"2026-09-20T21:14:37.089Z","actor":"julian","kind":"box_geometry","name":"n-claim","geom":{"x":539,"y":147,"w":168,"h":83}}
+{"ts":"2026-09-20T21:14:43.366Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":303,"y":453,"w":160,"h":56}}
+{"ts":"2026-09-20T21:14:50.143Z","actor":"julian","kind":"box_geometry","name":"n-render","geom":{"x":1080,"y":466,"w":120,"h":48}}
+{"ts":"2026-09-20T21:14:52.402Z","actor":"julian","kind":"box_geometry","name":"n-presentation","geom":{"x":1031,"y":258,"w":160,"h":56}}
+{"ts":"2026-09-20T21:14:54.915Z","actor":"julian","kind":"box_geometry","name":"n-graph","geom":{"x":745,"y":21,"w":148,"h":102}}
+{"ts":"2026-09-20T21:14:56.424Z","actor":"julian","kind":"box_geometry","name":"n-claim","geom":{"x":476,"y":147,"w":168,"h":83}}
+{"ts":"2026-09-20T21:14:57.932Z","actor":"julian","kind":"box_geometry","name":"n-fold","geom":{"x":325,"y":36,"w":120,"h":48}}
+{"ts":"2026-09-20T21:14:59.688Z","actor":"julian","kind":"box_geometry","name":"n_1789938511337_mfib","geom":{"x":87,"y":30,"w":180,"h":56}}
+{"ts":"2026-09-20T21:15:01.447Z","actor":"julian","kind":"box_geometry","name":"n-card","geom":{"x":34,"y":467,"w":140,"h":56}}
+{"ts":"2026-09-20T21:15:04.209Z","actor":"julian","kind":"box_geometry","name":"n-log","geom":{"x":18,"y":165,"w":114,"h":92}}
+{"ts":"2026-09-20T21:15:06.471Z","actor":"julian","kind":"box_geometry","name":"n_1789938511337_mfib","geom":{"x":148,"y":315,"w":180,"h":56}}
+{"ts":"2026-09-20T21:15:08.733Z","actor":"julian","kind":"box_geometry","name":"n-log","geom":{"x":25,"y":32,"w":114,"h":92}}
+{"ts":"2026-09-20T21:15:11.497Z","actor":"julian","kind":"box_geometry","name":"n-history","geom":{"x":298,"y":113,"w":120,"h":48}}
+{"ts":"2026-09-20T21:15:13.004Z","actor":"julian","kind":"box_geometry","name":"n_1789938511337_mfib","geom":{"x":145,"y":261,"w":180,"h":56}}
+{"ts":"2026-09-20T21:15:14.762Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":306,"y":538,"w":160,"h":56}}
+{"ts":"2026-09-20T21:17:34.649Z","actor":"paper","kind":"node","id":"n_1789938511337_mfib","label":"a renamed probe 11293","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:17:37.414Z","actor":"paper","kind":"edge","id":"n_1789938511337_mfib>n-card","from":"n_1789938511337_mfib","to":"n-card","label":"","superseded":true}
+{"ts":"2026-09-20T21:17:45.705Z","actor":"julian","kind":"box_geometry","name":"n-log","geom":{"x":43,"y":54,"w":114,"h":92}}
+{"ts":"2026-09-20T21:17:51.735Z","actor":"julian","kind":"box_geometry","name":"n-history","geom":{"x":239,"y":188,"w":120,"h":48}}
+{"ts":"2026-09-20T21:17:53.492Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":314,"y":472,"w":160,"h":56}}
+{"ts":"2026-09-20T21:17:55.250Z","actor":"julian","kind":"box_geometry","name":"n-claim","geom":{"x":460,"y":181,"w":168,"h":83}}
+{"ts":"2026-09-20T21:18:51.274Z","actor":"julian","kind":"edge","id":"n-engine>n-domain:never interprets (probe 17:18:46)","from":"n-engine","to":"n-domain","label":"never interprets (probe 17:18:46)"}
+{"ts":"2026-09-20T21:18:58.306Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":314,"y":592,"w":160,"h":56}}
+{"ts":"2026-09-20T21:19:01.068Z","actor":"julian","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card","label":""}
+{"ts":"2026-09-20T21:19:11.116Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":80,"y":152,"w":200,"h":140}}
+{"ts":"2026-09-20T21:21:24.014Z","actor":"julian","kind":"node","id":"n_1789939283874_3a3n","label":"a probe node 83821","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:21:26.777Z","actor":"julian","kind":"node","id":"n_1789939283874_3a3n","label":"a renamed probe 83821","node_kind":"object"}
+{"ts":"2026-09-20T21:22:04.244Z","actor":"paper","kind":"node","id":"n_1789939283874_3a3n","label":"a renamed probe 83821","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:22:09.518Z","actor":"julian","kind":"node","id":"n_1789939329381_druv","label":"a doomed node 24073","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:22:12.279Z","actor":"julian","kind":"edge","id":"n-card>n_1789939329381_druv:is doomed by","from":"n-card","to":"n_1789939329381_druv","label":"is doomed by"}
+{"ts":"2026-09-20T21:22:15.043Z","actor":"julian","kind":"node","id":"n_1789939329381_druv","label":"a doomed node 24073","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:22:17.804Z","actor":"julian","kind":"edge","id":"n-card>n_1789939329381_druv:is doomed by","from":"n-card","to":"n_1789939329381_druv","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:22:28.103Z","actor":"julian","kind":"node","id":"n_1789939347949_h3wn","label":"a probe node 47902","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:22:30.868Z","actor":"julian","kind":"node","id":"n_1789939347949_h3wn","label":"a renamed probe 47902","node_kind":"object"}
+{"ts":"2026-09-20T21:23:09.813Z","actor":"julian","kind":"node","id":"n_1789939389669_npmi","label":"a probe node 89624","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:23:12.575Z","actor":"julian","kind":"node","id":"n_1789939389669_npmi","label":"a renamed probe 89624","node_kind":"object"}
+{"ts":"2026-09-20T21:24:30.949Z","actor":"paper","kind":"node","id":"n_1789939347949_h3wn","label":"a renamed probe 47902","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:24:30.949Z","actor":"paper","kind":"node","id":"n_1789939389669_npmi","label":"a renamed probe 89624","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:24:33.462Z","actor":"julian","kind":"node","id":"n_1789939473387_apbw","label":"a probe node 70701","node_kind":"object","geom":{"x":1074,"y":441,"w":180,"h":56}}
+{"ts":"2026-09-20T21:24:36.225Z","actor":"julian","kind":"node","id":"n_1789939473387_apbw","label":"a renamed probe 70701","node_kind":"object"}
+{"ts":"2026-09-20T21:25:03.093Z","actor":"paper","kind":"node","id":"n_1789939473387_apbw","label":"a renamed probe 70701","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:25:08.369Z","actor":"julian","kind":"node","id":"n_1789939508303_4aln","label":"a doomed node 3010","node_kind":"object","geom":{"x":1074,"y":257,"w":180,"h":56}}
+{"ts":"2026-09-20T21:25:11.130Z","actor":"julian","kind":"edge","id":"n-card>n_1789939508303_4aln:is doomed by","from":"n-card","to":"n_1789939508303_4aln","label":"is doomed by"}
+{"ts":"2026-09-20T21:25:13.894Z","actor":"julian","kind":"node","id":"n_1789939508303_4aln","label":"a doomed node 3010","node_kind":"object","superseded":true}
+{"ts":"2026-09-20T21:25:16.912Z","actor":"julian","kind":"edge","id":"n-card>n_1789939508303_4aln:is doomed by","from":"n-card","to":"n_1789939508303_4aln","label":"is doomed by","superseded":true}
+{"ts":"2026-09-20T21:25:26.204Z","actor":"julian","kind":"node","id":"n_1789939526171_rr5n","label":"a probe node 23494","node_kind":"object","geom":{"x":1074,"y":441,"w":180,"h":56}}
+{"ts":"2026-09-20T21:25:28.965Z","actor":"julian","kind":"node","id":"n_1789939526171_rr5n","label":"a renamed probe 23494","node_kind":"object"}
+{"ts":"2026-09-20T21:25:36.499Z","actor":"julian","kind":"edge","id":"n-engine>n-domain:never interprets (probe 17:25:32)","from":"n-engine","to":"n-domain","label":"never interprets (probe 17:25:32)"}
+{"ts":"2026-09-20T21:25:38.259Z","actor":"julian","kind":"box_geometry","name":"n-claim","geom":{"x":451,"y":228,"w":168,"h":83}}
+{"ts":"2026-09-20T21:25:40.267Z","actor":"julian","kind":"box_geometry","name":"n-graph","geom":{"x":742,"y":43,"w":148,"h":102}}
+{"ts":"2026-09-20T21:25:42.525Z","actor":"julian","kind":"box_geometry","name":"n-fold","geom":{"x":342,"y":67,"w":120,"h":48}}
+{"ts":"2026-09-20T21:25:43.279Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":314,"y":680,"w":160,"h":56}}
+{"ts":"2026-09-20T21:25:44.284Z","actor":"julian","kind":"box_geometry","name":"n_1789939526171_rr5n","geom":{"x":119,"y":40,"w":180,"h":56}}
+{"ts":"2026-09-20T21:25:46.041Z","actor":"julian","kind":"edge","id":"n-log>n-card","from":"n-log","to":"n-card","label":""}
+{"ts":"2026-09-20T21:25:51.314Z","actor":"julian","kind":"box_geometry","name":"n-act","geom":{"x":699,"y":498,"w":120,"h":48}}
+{"ts":"2026-09-20T21:25:53.824Z","actor":"julian","kind":"box_geometry","name":"n-domain","geom":{"x":285,"y":562,"w":160,"h":56}}
+{"ts":"2026-09-20T21:25:56.334Z","actor":"julian","kind":"box_geometry","name":"A","geom":{"x":105,"y":212,"w":200,"h":140}}
+{"ts":"2026-09-20T21:25:58.592Z","actor":"julian","kind":"box_geometry","name":"n-log","geom":{"x":38,"y":179,"w":114,"h":92}}
+{"ts":"2026-09-20T21:26:00.599Z","actor":"julian","kind":"box_geometry","name":"n_1789939526171_rr5n","geom":{"x":66,"y":36,"w":180,"h":56}}

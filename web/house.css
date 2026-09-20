@@ -409,3 +409,7 @@ form .status {
   font: 11px/1.4 sans-serif; max-width: 80%; z-index: 4; pointer-events: none;
 }
 #edgelay line.path { stroke-width: 2.5; }
+
+/* pan/zoom: the view layer — model coordinates never move, the wrap does */
+#panewrap { position: absolute; inset: 0; transform-origin: 0 0; }
+#panewrap svg { overflow: visible; } /* lines may leave the viewport-shaped canvas */

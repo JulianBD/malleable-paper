@@ -86,8 +86,40 @@
       edges = [...m.values()].filter((e) => !e.superseded);
     }
 
+    // ——— pan/zoom (unit 9): the view is ephemeral presentation state ———
+    // Model coordinates never change; a wrap div inside the playground carries
+    // translate+scale, reset to identity on every frame build. Panning is an
+    // empty-plane drag; zooming is the wheel, anchored at the cursor. Nothing
+    // is logged: the view is not a fact about the domain, only about the eye.
+    let view = { x: 0, y: 0, k: 1 };
+    function applyView() {
+      const w = playground?.querySelector('#panewrap');
+      if (w) w.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.k + ')';
+    }
+    const toModel = (cx, cy) => { // screen → model (view-aware)
+      const r = playground.getBoundingClientRect();
+      return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k };
+    };
+    const toScreen = (x, y) => ({ x: x * view.k + view.x, y: y * view.k + view.y });
+    function wrapOf() {
+      let w = playground.querySelector('#panewrap');
+      if (!w) { w = document.createElement('div'); w.id = 'panewrap'; playground.append(w); }
+      return w;
+    }
+    plane.addEventListener('wheel', (e) => {
+      if (!sketch || !playground) return;
+      e.preventDefault();
+      const m = toModel(e.clientX, e.clientY);
+      view.k = Math.min(3, Math.max(0.3, view.k * Math.exp(-e.deltaY * 0.0012)));
+      const r = playground.getBoundingClientRect();
+      view.x = e.clientX - r.left - m.x * view.k;
+      view.y = e.clientY - r.top - m.y * view.k;
+      applyView();
+    }, { passive: false });
+
     function render() {
       if (!playground) return; // geometry frame not mounted
+      const wrap = wrapOf();
       // removal is reprojection too: a superseded node folds out of `boxes`,
       // and its element must leave the DOM (found by supersedeprobe)
       for (const el of playground.querySelectorAll('.box'))
@@ -108,7 +140,7 @@
             h.dataset.corner = c;
             el.append(h);
           }
-          playground.append(el);
+          wrap.append(el);
         }
         // reproject EVERY render — a rename must reach an existing element's
         // label, not just a freshly created one (found by makeprobe)
@@ -137,7 +169,7 @@
       if (!svg) {
         svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.id = 'edgelay';
-        playground.prepend(svg);
+        wrapOf().prepend(svg);
       }
       svg.setAttribute('width', playground.clientWidth);
       svg.setAttribute('height', playground.clientHeight);
@@ -182,7 +214,7 @@
       }
       if (link) { // the rubber band — ephemeral, never logged
         const s = boxes.find((b) => b.name === link.from);
-        if (s) html += `<line class="rubber" x1="${s.x + s.w / 2}" y1="${s.y + s.h / 2}" x2="${link.px - playground.getBoundingClientRect().left}" y2="${link.py - playground.getBoundingClientRect().top}"/>`;
+        if (s) html += `<line class="rubber" x1="${s.x + s.w / 2}" y1="${s.y + s.h / 2}" x2="${(link.px - playground.getBoundingClientRect().left - view.x) / view.k}" y2="${(link.py - playground.getBoundingClientRect().top - view.y) / view.k}"/>`;
       }
       // the reading strip: the composed sentence IS the composition check —
       // a path that reads grammatically is admissible; one that stumbles is
@@ -443,7 +475,9 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
     // ——— gestures: drag in the playground, swipe in doc boxes ———
     let swipe = null;
     plane.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.nav')) return; // let the page buttons click
+      if (e.target.closest('.nav, .frame-nav')) return; // let the page buttons click —
+      // .frame-nav too: the pan branch would capture the pointer and swallow
+      // the arrow buttons' clicks in the sketch frame (found by panprobe)
       const docEl = e.target.closest('.box.doc');
       if (docEl) {
         if (!docEl.querySelector('.pager')) return; // not swipeable (reader)
@@ -453,7 +487,16 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         return;
       }
       const boxEl = e.target.closest('.box');
-      if (!boxEl) return;
+      if (!boxEl) {
+        // empty-plane drag in the sketch = PAN (ephemeral). Edges and marks
+        // own their own downs; asks/panels sit at screen level and are skipped.
+        if (sketch && playground && !e.target.closest('#edgelay, .checkpanel, .verbin, #pathstrip')) {
+          drag = { mode: 'pan', px: e.clientX, py: e.clientY, sx: view.x, sy: view.y };
+          plane.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }
+        return;
+      }
       const i = +boxEl.dataset.i;
       // link gesture (sketch frame): grab a node's LABEL to draw an edge —
       // body drag moves it, label drag relates it. Tactile split, no modifier.
@@ -505,6 +548,12 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         renderEdges();
         return;
       }
+      if (drag && drag.mode === 'pan') { // the eye moves, not the world
+        view.x = drag.sx + (e.clientX - drag.px);
+        view.y = drag.sy + (e.clientY - drag.py);
+        applyView();
+        return;
+      }
       if (!drag) return;
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
       const g = drag.mode === 'move'
@@ -532,8 +581,9 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       const el = document.createElement('input');
       el.className = 'verbin';
       el.placeholder = 'verb phrase?';
-      el.style.left = mx + 'px';
-      el.style.top = my + 'px';
+      const s = toScreen(mx, my); // the ask converses at screen level
+      el.style.left = s.x + 'px';
+      el.style.top = s.y + 'px';
       playground.append(el);
       el.focus();
       verbAsk = { from, to, el };
@@ -566,8 +616,9 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       el.className = 'verbin'; // same house style — it IS the same kind of ask
       el.placeholder = mode === 'create' ? 'noun phrase?' : 'rename?';
       el.value = prefill ?? '';
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
+      const s = toScreen(x, y); // model → screen: asks live at eye level
+      el.style.left = s.x + 'px';
+      el.style.top = s.y + 'px';
       playground.append(el);
       el.focus();
       el.select();
@@ -604,9 +655,11 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         const b = boxes[+boxEl.dataset.i];
         if (!b) return;
         askName('rename', b.x + b.w / 2, b.y + b.h / 2, b.name, b.label);
-      } else if (hit === playground) { // create at the click point
-        const r = playground.getBoundingClientRect();
-        askName('create', e.clientX - r.left, e.clientY - r.top, null, '');
+      } else if (!hit.closest('.box, .verbin, .checkpanel, .badge, #edgelay .hit')) {
+        // create at the click point — empty space is now the panewrap/svg
+        // covering the playground (hit === playground never fires anymore)
+        const m = toModel(e.clientX, e.clientY);
+        askName('create', m.x, m.y, null, '');
       }
       // clicks on box bodies / handles / doc elements: not ours
     });
@@ -637,6 +690,18 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
           if (selected) { selected = null; render(); renderEdges(); }
           closeCheck();
         }
+        return;
+      }
+      // pan release: a pan that never moved is a plain empty-plane click —
+      // deselect and close evidence, same as the no-capture path
+      if (drag.mode === 'pan') {
+        const moved = Math.abs(e.clientX - drag.px) >= 4 || Math.abs(e.clientY - drag.py) >= 4;
+        if (!moved && !e.target.closest?.('#edgelay')) {
+          if (selected) { selected = null; render(); renderEdges(); }
+          closeCheck();
+        }
+        drag = null;
+        plane.releasePointerCapture(e.pointerId);
         return;
       }
       // a click that never moved: select the node (sketch) — selection is
@@ -738,6 +803,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           playground = document.getElementById('playground');
           playground.classList.add('sketchplay');
           sketch = true;
+          view = { x: 0, y: 0, k: 1 }; // the eye resets; the log does not
           foldNodes();
           foldEdges();
           foldGeometry(); // dragged-node positions, name = node id
