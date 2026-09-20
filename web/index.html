@@ -370,18 +370,27 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       }
     });
 
-    // tiny markdown subset: code blocks, inline code, bold, italic, links, lists, paragraphs
+    // tiny markdown subset: code blocks, inline code, bold, italic, links, lists, tables, paragraphs
     function md(src) {
-      let s2 = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      s2 = s2.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
-      s2 = s2.replace(/`([^`]+)`/g, '<code>$1</code>');
-      s2 = s2.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      s2 = s2.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
-      s2 = s2.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-      s2 = s2.replace(/(^|\n)((?:- .*\n?)+)/g, (_, pre, list) =>
+      let s = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      s = s.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      s = s.replace(/(^|\n)((?:- .*\n?)+)/g, (_, pre, list) =>
         pre + '<ul>' + list.trim().split('\n').map((l) => '<li>' + l.slice(2) + '</li>').join('') + '</ul>');
-      return s2.split(/\n{2,}/).map((p) =>
-        /^<(ul|pre)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+      // tables: | a | b | rows, second row a --- separator
+      s = s.replace(/(^|\n)((?:\|[^\n]*\n?)+)/g, (_, pre, block) => {
+        const rows = block.trim().split('\n').map((r) => r.split('|').slice(1, -1).map((c) => c.trim()));
+        if (rows.length < 2 || !rows[1].every((c) => /^:?-{3,}:?$/.test(c))) return pre + block;
+        const cell = (c, tag) => '<' + tag + '>' + c + '</' + tag + '>';
+        let html = '<table><tr>' + rows[0].map((c) => cell(c, 'th')).join('') + '</tr>';
+        for (const r of rows.slice(2)) html += '<tr>' + r.map((c) => cell(c, 'td')).join('') + '</tr>';
+        return pre + html + '</table>';
+      });
+      return s.split(/\n{2,}/).map((p) =>
+        /^<(ul|pre|table)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
     }
 
     let seen = -1;

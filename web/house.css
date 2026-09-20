@@ -216,6 +216,18 @@ output p.msg .body code {
   padding: 0 3px;
 }
 output p.msg .body pre code { border: 0; padding: 0; }
+output p.msg .body table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 13px;
+}
+output p.msg .body th, output p.msg .body td {
+  border: 1px solid #000;
+  padding: 3px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+output p.msg .body th { border-width: 2px 1px 1px; }
 output p.msg .body a { color: #000; text-decoration: underline; }
 
 form {
