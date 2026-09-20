@@ -7,8 +7,13 @@
   <link rel="stylesheet" href="/house.css" />
 </head>
 <body>
-  <main>
-    <textarea id="canvas" placeholder="write" autofocus></textarea>
+  <main id="plane">
+    <div class="box" id="box">
+      <div class="handle" data-corner="nw"></div>
+      <div class="handle" data-corner="ne"></div>
+      <div class="handle" data-corner="sw"></div>
+      <div class="handle" data-corner="se"></div>
+    </div>
   </main>
 
   <footer id="meta">
@@ -22,6 +27,58 @@
   </footer>
 
   <script>
+    // ——— box: grab body to move, grab a corner to resize ———
+    const plane = document.getElementById('plane');
+    const box = document.getElementById('box');
+    let geom = { x: 80, y: 80, w: 240, h: 160 }; // plane coordinates
+    let drag = null; // { mode: 'move'|'resize', corner, px, py, start }
+
+    function render() {
+      box.style.left = geom.x + 'px';
+      box.style.top = geom.y + 'px';
+      box.style.width = geom.w + 'px';
+      box.style.height = geom.h + 'px';
+    }
+
+    box.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('.handle');
+      drag = handle
+        ? { mode: 'resize', corner: handle.dataset.corner, px: e.clientX, py: e.clientY, start: { ...geom } }
+        : { mode: 'move', px: e.clientX, py: e.clientY, start: { ...geom } };
+      box.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    box.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
+      const s = drag.start;
+      if (drag.mode === 'move') {
+        geom.x = s.x + dx;
+        geom.y = s.y + dy;
+      } else {
+        let { x, y, w, h } = s;
+        if (drag.corner.includes('e')) w = s.w + dx;
+        if (drag.corner.includes('s')) h = s.h + dy;
+        if (drag.corner.includes('w')) { x = s.x + dx; w = s.w - dx; }
+        if (drag.corner.includes('n')) { y = s.y + dy; h = s.h - dy; }
+        // don't invert through zero
+        if (w >= 20 && h >= 20) geom = { x, y, w, h };
+      }
+      render();
+    });
+
+    box.addEventListener('pointerup', (e) => {
+      if (drag) {
+        drag = null;
+        box.releasePointerCapture(e.pointerId);
+        console.log('box', geom);
+      }
+    });
+
+    render();
+
+    // ——— meta drawer (unchanged) ———
     const f = document.getElementById('f'),
           t = document.getElementById('t'),
           b = document.getElementById('b'),
@@ -36,7 +93,6 @@
       if (open) log.scrollTop = log.scrollHeight;
     });
 
-    // send gesture: shift+enter or shift+plus — plain enter is a no-op
     t.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === '+') {
         e.preventDefault();
@@ -67,7 +123,6 @@
       }
     });
 
-    // polling the shared log
     let seen = -1;
     async function poll() {
       try {
