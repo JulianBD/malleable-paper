@@ -129,6 +129,7 @@
     // is a gesture; a selection you stare at stays free)
     let selected = null; // { type: 'node'|'edge', id }
     let checkPanel = null; // { ev, el } — evidence for a check mark, ephemeral
+    let pathIds = []; // the reading chain — ephemeral; the composed sentence is the composition check
 
     function renderEdges() {
       if (!playground) return;
@@ -159,7 +160,7 @@
           const x1 = a ? s.x + s.w + 10 : s.x - 10; // just outside the box
           const dx = a ? 50 : -50;
           const bx = x1 + dx + (a ? 12 : -12);
-          html += `<line class="dang" x1="${x1}" y1="${y1}" x2="${x1 + dx}" y2="${y1}"/>`;
+          html += `<line${isSel ? ' class="dang sel"' : ' class="dang"'} x1="${x1}" y1="${y1}" x2="${x1 + dx}" y2="${y1}"/>`;
           html += `<line class="hit dangsel" data-ev="${esc(e.id)}" x1="${x1}" y1="${y1}" x2="${x1 + dx}" y2="${y1}"/>`;
           html += `<g class="badge" data-ev="${esc(e.id)}"><circle cx="${bx}" cy="${y1}" r="9"/><text x="${bx}" y="${y1 + 4}" text-anchor="middle">⊘</text></g>`;
           html += `<text class="dangtxt" x="${x1 + dx / 2}" y="${y1 - 6}" text-anchor="middle">${esc(miss)} is gone</text>`;
@@ -167,7 +168,8 @@
         }
         const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2, x2 = c.x + c.w / 2, y2 = c.y + c.h / 2;
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        const cls = isSel ? ' class="sel"' : '';
+        const onPath = pathIds.includes(e.id);
+        const cls = (isSel || onPath) ? ` class="${isSel ? 'sel ' : ''}${onPath ? 'path' : ''}"` : '';
         // wide transparent hit-line makes edges clickable for selection
         html += `<line class="hit" data-ev="${esc(e.id)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
         html += `<line${cls} x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
@@ -182,6 +184,28 @@
         const s = boxes.find((b) => b.name === link.from);
         if (s) html += `<line class="rubber" x1="${s.x + s.w / 2}" y1="${s.y + s.h / 2}" x2="${link.px - playground.getBoundingClientRect().left}" y2="${link.py - playground.getBoundingClientRect().top}"/>`;
       }
+      // the reading strip: the composed sentence IS the composition check —
+      // a path that reads grammatically is admissible; one that stumbles is
+      // either a new insight or a badly-verb'd arrow. Ephemeral, never stored.
+      let strip = document.getElementById('pathstrip');
+      if (pathIds.length) {
+        if (!strip) { strip = document.createElement('div'); strip.id = 'pathstrip'; playground.append(strip); }
+        let sentence = '';
+        let prevTo = null;
+        for (const id of pathIds) {
+          const e2 = edges.find((v) => v.id === id);
+          if (!e2 || e2.superseded) continue;
+          const fb = boxes.find((b) => b.name === e2.from), tb = boxes.find((b) => b.name === e2.to);
+          if (!fb || !tb) continue;
+          const verb = e2.label || 'relates to';
+          if (!prevTo) sentence = (fb.label ?? fb.name) + ' ' + verb + ' ' + (tb.label ?? tb.name);
+          else if (e2.from === prevTo) sentence += ', which ' + verb + ' ' + (tb.label ?? tb.name);
+          else sentence += ' · (chain breaks: ' + (fb.label ?? fb.name) + ') ' + verb + ' ' + (tb.label ?? tb.name);
+          prevTo = e2.to;
+        }
+        strip.textContent = sentence + ' — esc clears';
+        strip.style.display = '';
+      } else if (strip) strip.style.display = 'none';
       svg.innerHTML = html;
       // edge selection + check-evidence clicks (svg innerHTML kills listeners,
       // so delegate at the svg)
@@ -190,7 +214,16 @@
         if (!hit) return;
         if (hit.classList.contains('badge')) { showCheck(hit.dataset.ev); return; }
         const e = edges.find((v) => v.id === hit.dataset.ev);
-        if (e) { selected = { type: 'edge', id: e.id }; renderEdges(); render(); }
+        if (e) {
+          selected = { type: 'edge', id: e.id };
+          // path-to-sentence: a click that continues the chain extends it;
+          // an unconnected click starts a new reading. Escape clears.
+          const last = pathIds.length ? edges.find((v) => v.id === pathIds[pathIds.length - 1]) : null;
+          if (!last || last.to === e.from) {
+            if (!pathIds.includes(e.id)) pathIds.push(e.id);
+          } else pathIds = [e.id];
+          renderEdges(); render();
+        }
       };
     }
 
@@ -569,7 +602,13 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
         return;
       }
       if (!drag) { // empty-plane click in sketch mode: drop selection + close evidence
-        if (sketch) { if (selected) { selected = null; render(); renderEdges(); } closeCheck(); }
+        // — unless the up lands on an edge hit-line: rebuilding the svg here
+        // would destroy the line mid-gesture and swallow its click (found by
+        // pathprobe); the click handler owns edge selection
+        if (sketch && !e.target.closest?.('#edgelay')) {
+          if (selected) { selected = null; render(); renderEdges(); }
+          closeCheck();
+        }
         return;
       }
       // a click that never moved: select the node (sketch) — selection is
@@ -718,6 +757,11 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
     document.addEventListener('keydown', (e) => {
       if (e.target === t || e.target === verbAsk?.el || e.target === nameAsk?.el) return; // typing in the chat bar or any inline ask
+      if (e.key === 'Escape' && sketch && selected) { // esc clears the reading chain + selection
+        selected = null; pathIds = [];
+        if (playground) { render(); renderEdges(); }
+        return;
+      }
       if ((e.key === 'Backspace' || e.key === 'Delete') && sketch && selected) {
         // supersede, never delete: the act re-emits with superseded:true —
         // presence folds away, identity and history survive
