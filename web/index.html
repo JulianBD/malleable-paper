@@ -31,23 +31,116 @@
     const boxes = [
       { x: 80, y: 80, w: 240, h: 160 },
       { x: 0, y: 80, w: 240, h: 160 }, // parked on the other side at init
+      { x: 0, y: 0, w: 380, h: 260, doc: true }, // the walkthrough box
     ];
     let drag = null; // { i, mode, corner, px, py, start }
     const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+    const PAGES = [
+      `— gesture model —
+
+on pointerdown(box):
+  drag = { start: copy(box),
+           mode: move | resize,
+           corner }        // if a handle
+
+on pointermove:
+  dx = ptr.x - drag.px    // TOTAL since start
+  geom' = clamp(drag.start, dx, dy)
+                         // computed from START
+  box := geom'            // never accumulates
+
+on pointerup:
+  drag = null             // no barrier persists`,
+      `— corner types —
+
+every box exposes 4 typed corners:
+
+  NW   solid to the EAST
+  NE   solid to the WEST
+  SW   solid to the EAST
+  SE   solid to the WEST
+
+(and vertically: N corners
+ are solid downward, S upward)
+
+the viewport is 4 more corners
+at the frame edges — bounds
+are just corners facing you`,
+      `— move clamp —
+
+x = start.x + dx
+for other box o, vertical overlap:
+  if dx > 0:
+    x = min(x, o.x - w)      // o's W corners
+  if dx < 0:
+    x = max(x, o.x + o.w)    // o's E corners
+x = clamp(x, 0, planeW - w)
+
+then y, same shape, with x
+already applied (per-axis, in
+order — see page 5)`,
+      `— resize clamp —
+
+only the moving edge changes;
+the stationary edge anchors.
+
+E edge: r = start.r + dx
+  for o, vertical overlap:
+    r = min(r, o.x)
+  r = clamp(r, start.x+20, planeW)
+
+W, S, N symmetric. Min size
+20px throughout.`,
+      `— the bug / the fix —
+
+BUG: bounds fire regardless of
+which SIDE o is on. Dragging
+left applies o's east edge even
+when o is to the RIGHT →
+the box teleports past it.
+
+FIX: guard by direction —
+  if dx > 0 and o.x >= start.r:
+    x = min(x, o.x - w)
+  if dx < 0 and o.x+o.w <= start.x:
+    x = max(x, o.x + o.w)
+
+(the corner TYPE was meant to
+carry exactly this information;
+the first draft dropped it)`,
+    ];
 
     function render() {
       boxes.forEach((b, i) => {
         let el = document.getElementById('box' + i);
         if (!el) {
           el = document.createElement('div');
-          el.className = 'box';
+          el.className = 'box' + (b.doc ? ' doc' : '');
           el.id = 'box' + i;
           el.dataset.i = i;
-          for (const c of ['nw', 'ne', 'sw', 'se']) {
-            const h = document.createElement('div');
-            h.className = 'handle';
-            h.dataset.corner = c;
-            el.append(h);
+          if (b.doc) {
+            el.innerHTML = '<div class="page"></div>' +
+              '<button class="nav prev">‹</button>' +
+              '<button class="nav next">›</button>' +
+              '<div class="pager"></div>';
+            let page = 0;
+            const show = (n) => {
+              page = Math.max(0, Math.min(PAGES.length - 1, n));
+              el.querySelector('.page').textContent = PAGES[page];
+              el.querySelector('.pager').textContent = (page + 1) + '/' + PAGES.length;
+            };
+            el.querySelector('.prev').addEventListener('click', () => show(page - 1));
+            el.querySelector('.next').addEventListener('click', () => show(page + 1));
+            el._show = show;
+            show(0);
+          } else {
+            for (const c of ['nw', 'ne', 'sw', 'se']) {
+              const h = document.createElement('div');
+              h.className = 'handle';
+              h.dataset.corner = c;
+              el.append(h);
+            }
           }
           plane.append(el);
         }
@@ -112,7 +205,16 @@
       return { x, y, w: r - x, h: btm - y };
     }
 
+    // swipe pages on the doc box (it is not draggable)
+    let swipe = null;
     plane.addEventListener('pointerdown', (e) => {
+      const docEl = e.target.closest('.box.doc');
+      if (docEl) {
+        swipe = { el: docEl, px: e.clientX, page: +docEl.querySelector('.pager').textContent.split('/')[0] - 1 };
+        plane.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
       const boxEl = e.target.closest('.box');
       if (!boxEl) return;
       const i = +boxEl.dataset.i;
@@ -135,14 +237,23 @@
     });
 
     plane.addEventListener('pointerup', (e) => {
+      if (swipe) {
+        const dx = e.clientX - swipe.px;
+        if (Math.abs(dx) > 40) swipe.el._show(swipe.page + (dx < 0 ? 1 : -1));
+        swipe = null;
+        plane.releasePointerCapture(e.pointerId);
+        return;
+      }
       if (!drag) return;
       console.log('box' + drag.i, boxes[drag.i]);
       drag = null;
       plane.releasePointerCapture(e.pointerId);
     });
 
-    // park the second box on the other side of the plane
+    // park the second box on the other side; center the doc box below
     boxes[1].x = plane.clientWidth - boxes[1].w - 80;
+    boxes[2].x = (plane.clientWidth - boxes[2].w) / 2;
+    boxes[2].y = plane.clientHeight - boxes[2].h - 40;
     render();
 
     // ——— meta drawer (unchanged) ———

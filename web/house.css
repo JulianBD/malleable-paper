@@ -51,6 +51,42 @@ textarea, input, button {
   font: inherit;
 }
 
+/* the doc box: authored content, swipeable pages */
+.box.doc {
+  background: #fff;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+}
+.box.doc .page {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 14px;
+  font: 11px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre;
+}
+.box.doc .nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font: 14px/1 inherit;
+  cursor: pointer;
+}
+.box.doc .nav.prev { left: -11px; }
+.box.doc .nav.next { right: -11px; }
+.box.doc .pager {
+  align-self: center;
+  font-size: 10px;
+  color: #666;
+  padding: 2px 0 4px;
+}
+
 /* page furniture */
 html, body { height: 100%; }
 body {
