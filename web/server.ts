@@ -27,6 +27,20 @@ const server = Bun.serve({
     if (req.method === "GET" && url.pathname === "/events") {
       return Response.json(await readEvents());
     }
+    if (req.method === "POST" && url.pathname === "/event") {
+      let body: Record<string, unknown>;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response("invalid json", { status: 400 });
+      }
+      if (typeof body.kind !== "string" || !body.kind) {
+        return new Response("kind required", { status: 400 });
+      }
+      const event = { ts: new Date().toISOString(), ...body };
+      await appendFile(LOG, JSON.stringify(event) + "\n");
+      return Response.json({ ok: true });
+    }
     if (req.method === "POST" && url.pathname === "/message") {
       let body: { text?: unknown };
       try {

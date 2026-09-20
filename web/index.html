@@ -14,6 +14,8 @@
     <form id="f">
       <button type="button" class="region" id="toggle">meta ▴</button>
       <div class="sep"></div>
+      <button type="button" class="region" id="record">record ○</button>
+      <div class="sep"></div>
       <input id="t" placeholder="message the paper" autocomplete="off" />
       <div class="sep"></div>
       <button id="b" type="submit" class="region">send</button>
@@ -31,8 +33,8 @@
     // that face the direction of motion.
     const plane = document.getElementById('plane');
     const boxes = [
-      { x: 80, y: 80, w: 240, h: 160 },
-      { x: 0, y: 80, w: 240, h: 160 }, // parked on the other side at init
+      { name: 'A', x: 80, y: 80, w: 240, h: 160 },
+      { name: 'B', x: 0, y: 80, w: 240, h: 160 }, // parked on the other side at init
       { x: 0, y: 0, w: 380, h: 260, doc: true }, // the walkthrough box
     ];
     let drag = null; // { i, mode, corner, px, py, start }
@@ -137,6 +139,10 @@ the first draft dropped it)`,
             el._show = show;
             show(0);
           } else {
+            const label = document.createElement('span');
+            label.className = 'label';
+            label.textContent = b.name ?? '';
+            el.append(label);
             for (const c of ['nw', 'ne', 'sw', 'se']) {
               const h = document.createElement('div');
               h.className = 'handle';
@@ -160,20 +166,21 @@ the first draft dropped it)`,
     function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
       const pw = plane.clientWidth, ph = plane.clientHeight;
       const others = boxes.filter((o) => o !== drag.target);
-      // x axis: west corners (NW/SW) bound eastward motion, east corners (NE/SE) westward
+      // x axis: only boxes actually to the east/west bound the motion
+      // (a west corner bounds you only if you're coming at it from the west)
       let x = s.x + dx;
       for (const o of others) {
         if (!yOver(s.y, s.y + s.h, o)) continue;
-        if (dx > 0) x = Math.min(x, o.x - s.w);
-        if (dx < 0) x = Math.max(x, o.x + o.w);
+        if (dx > 0 && o.x >= s.x + s.w) x = Math.min(x, o.x - s.w);
+        if (dx < 0 && o.x + o.w <= s.x) x = Math.max(x, o.x + o.w);
       }
       x = clamp(x, 0, pw - s.w);
-      // y axis, with x already applied: north corners bound downward motion, south corners upward
+      // y axis, with x already applied
       let y = s.y + dy;
       for (const o of others) {
         if (!xOver(x, x + s.w, o)) continue;
-        if (dy > 0) y = Math.min(y, o.y - s.h);
-        if (dy < 0) y = Math.max(y, o.y + o.h);
+        if (dy > 0 && o.y >= s.y + s.h) y = Math.min(y, o.y - s.h);
+        if (dy < 0 && o.y + o.h <= s.y) y = Math.max(y, o.y + o.h);
       }
       y = clamp(y, 0, ph - s.h);
       return { x, y };
@@ -186,22 +193,22 @@ the first draft dropped it)`,
       let { x, y } = e, r = e.r, btm = e.b;
       if (corner.includes('e')) {
         r = e.r + dx;
-        for (const o of others) if (yOver(e.y, e.b, o)) r = Math.min(r, o.x); // o's west corners
+        for (const o of others) if (yOver(e.y, e.b, o) && o.x >= e.r) r = Math.min(r, o.x); // o's west corners, only if o is east of us
         r = clamp(r, e.x + 20, pw);
       }
       if (corner.includes('w')) {
         x = e.x + dx;
-        for (const o of others) if (yOver(e.y, e.b, o)) x = Math.max(x, o.x + o.w); // o's east corners
+        for (const o of others) if (yOver(e.y, e.b, o) && o.x + o.w <= e.x) x = Math.max(x, o.x + o.w); // o's east corners, only if west of us
         x = clamp(x, 0, e.r - 20);
       }
       if (corner.includes('s')) {
         btm = e.b + dy;
-        for (const o of others) if (xOver(e.x, e.r, o)) btm = Math.min(btm, o.y); // o's north corners
+        for (const o of others) if (xOver(e.x, e.r, o) && o.y >= e.b) btm = Math.min(btm, o.y);
         btm = clamp(btm, e.y + 20, ph);
       }
       if (corner.includes('n')) {
         y = e.y + dy;
-        for (const o of others) if (xOver(e.x, e.r, o)) y = Math.max(y, o.y + o.h); // o's south corners
+        for (const o of others) if (xOver(e.x, e.r, o) && o.y + o.h <= e.y) y = Math.max(y, o.y + o.h);
         y = clamp(y, 0, e.b - 20);
       }
       return { x, y, w: r - x, h: btm - y };
@@ -238,6 +245,30 @@ the first draft dropped it)`,
       render();
     });
 
+    // record: toggle position tracking — snapshot on start, then every release
+    const recordBtn = document.getElementById('record');
+    let recording = false;
+    async function logEvent(ev) {
+      try {
+        await fetch('/event', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ actor: 'julian', ...ev }),
+        });
+      } catch {}
+    }
+    recordBtn.addEventListener('click', () => {
+      recording = !recording;
+      recordBtn.textContent = recording ? 'record ●' : 'record ○';
+      recordBtn.classList.toggle('active', recording);
+      if (recording) {
+        for (const b of boxes) {
+          if (b.doc) continue;
+          logEvent({ kind: 'box_geometry', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
+        }
+      }
+    });
+
     plane.addEventListener('pointerup', (e) => {
       if (swipe) {
         const dx = e.clientX - swipe.px;
@@ -247,6 +278,10 @@ the first draft dropped it)`,
         return;
       }
       if (!drag) return;
+      if (recording) {
+        const b = boxes[drag.i];
+        logEvent({ kind: 'box_geometry', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
+      }
       console.log('box' + drag.i, boxes[drag.i]);
       drag = null;
       plane.releasePointerCapture(e.pointerId);
