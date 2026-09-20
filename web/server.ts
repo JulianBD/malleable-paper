@@ -54,6 +54,9 @@ const server = Bun.serve({
       const event = {
         ts: new Date().toISOString(),
         kind: "human_message",
+        // R1 (ruled 13:35): message ids; R2: actor everywhere
+        id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        actor: "human",
         text: body.text,
       };
       await appendFile(LOG, JSON.stringify(event) + "\n");

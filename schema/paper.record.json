@@ -1,0 +1,30 @@
+{
+  "lexicon": 1,
+  "id": "paper.record",
+  "status": "draft",
+  "node": "#record (bottom bar)",
+  "comment": "RULED R3c (13:35): record is a speech act, not a UI toggle. The start/stop events bracket an intentional demonstration; box geometry under the span means 'Julian is showing me something'. The drawer, by contrast, stays ephemeral (view state, no fold wants it).",
+  "events": {
+    "emits": {
+      "record_start": {"type": "object", "required": ["ts", "kind", "actor"]},
+      "record_stop":  {"type": "object", "required": ["ts", "kind", "actor"]}
+    },
+    "consumes": ["record_start", "record_stop", "box_geometry", "box_drag"]
+  },
+  "domain": {
+    "fold": "pair record_start with its record_stop → demonstration spans",
+    "states": {
+      "idle":     {"on": {"record_start": "recording"}},
+      "recording": {"on": {"record_stop": "idle"}}
+    },
+    "derives": {
+      "demonstrations": "spans [start,stop]; geometry/drag events within a span are communication, not just state"
+    },
+    "intents": ["start", "stop"],
+    "acts": {
+      "toggle": {"event": "record_start | record_stop", "via": "POST /event"}
+    }
+  },
+  "system": {"tick": "button click only; no poll"},
+  "render": {"element": "#record", "template": "record ○ / record ● + .active", "ephemeral": []}
+}

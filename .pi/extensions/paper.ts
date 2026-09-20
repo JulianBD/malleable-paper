@@ -40,7 +40,14 @@ export default function (pi: ExtensionAPI) {
     lastReplyText = null;
     await appendFile(
       LOG,
-      JSON.stringify({ ts: new Date().toISOString(), kind: "agent_message", text }) + "\n",
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        kind: "agent_message",
+        // R1 + R2 (ruled 13:35): id and actor on every message
+        id: "m_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        actor: "agent",
+        text,
+      }) + "\n",
     ).catch(() => {});
   });
 

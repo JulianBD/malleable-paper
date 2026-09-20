@@ -277,6 +277,10 @@ One clause is still owed: a box flanked on both axes at once — one neighbor ea
       recording = !recording;
       recordBtn.textContent = recording ? 'record ●' : 'record ○';
       recordBtn.classList.toggle('active', recording);
+      // R3c (ruled 13:35): record is a speech act, not a UI toggle —
+      // the start/stop events bracket a demonstration; box geometry
+      // snapshots under the span mean 'Julian is showing me something'.
+      logEvent({ kind: recording ? 'record_start' : 'record_stop' });
       if (recording) {
         for (const b of boxes) {
           logEvent({ kind: 'box_geometry', name: b.name, geom: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } });
