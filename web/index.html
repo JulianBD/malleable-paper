@@ -53,17 +53,21 @@
       if (!drag) return;
       const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
       const s = drag.start;
+      const pw = plane.clientWidth, ph = plane.clientHeight;
+      const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
       if (drag.mode === 'move') {
-        geom.x = s.x + dx;
-        geom.y = s.y + dy;
+        geom.x = clamp(s.x + dx, 0, pw - s.w);
+        geom.y = clamp(s.y + dy, 0, ph - s.h);
       } else {
+        // edges: stationary edge anchors, moving edge clamped to plane
         let { x, y, w, h } = s;
-        if (drag.corner.includes('e')) w = s.w + dx;
-        if (drag.corner.includes('s')) h = s.h + dy;
-        if (drag.corner.includes('w')) { x = s.x + dx; w = s.w - dx; }
-        if (drag.corner.includes('n')) { y = s.y + dy; h = s.h - dy; }
-        // don't invert through zero
-        if (w >= 20 && h >= 20) geom = { x, y, w, h };
+        if (drag.corner.includes('e')) w = clamp(s.x + s.w + dx, s.x + 20, pw) - s.x;
+        if (drag.corner.includes('s')) h = clamp(s.y + s.h + dy, s.y + 20, ph) - s.y;
+        if (drag.corner.includes('w')) x = clamp(s.x + dx, 0, s.x + s.w - 20);
+        if (drag.corner.includes('n')) y = clamp(s.y + dy, 0, s.y + s.h - 20);
+        w = (drag.corner.includes('w') ? s.x + s.w : s.x + w) - x;
+        h = (drag.corner.includes('n') ? s.y + s.h : s.y + h) - y;
+        geom = { x, y, w, h };
       }
       render();
     });
