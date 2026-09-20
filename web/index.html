@@ -166,24 +166,33 @@ the first draft dropped it)`,
     function tryMove(s, dx, dy) { // s = gesture-start geometry; returns final {x, y}
       const pw = plane.clientWidth, ph = plane.clientHeight;
       const others = boxes.filter((o) => o !== drag.target);
-      // x axis: only boxes actually to the east/west bound the motion
-      // (a west corner bounds you only if you're coming at it from the west)
-      let x = s.x + dx;
-      for (const o of others) {
-        if (!yOver(s.y, s.y + s.h, o)) continue;
-        if (dx > 0 && o.x >= s.x + s.w) x = Math.min(x, o.x - s.w);
-        if (dx < 0 && o.x + o.w <= s.x) x = Math.max(x, o.x + o.w);
+      // resolve the DOMINANT axis first, so the second axis's overlap test
+      // sees the updated position — a diagonal escape isn't pinned by a
+      // stale start-span overlap (B sliding up-and-right out from beside A)
+      const clampX = (y0, y1) => {
+        let x = s.x + dx;
+        for (const o of others) {
+          if (!(y0 < o.y + o.h && o.y < y1)) continue;
+          if (dx > 0 && o.x >= s.x + s.w) x = Math.min(x, o.x - s.w);
+          if (dx < 0 && o.x + o.w <= s.x) x = Math.max(x, o.x + o.w);
+        }
+        return clamp(x, 0, pw - s.w);
+      };
+      const clampY = (x0, x1) => {
+        let y = s.y + dy;
+        for (const o of others) {
+          if (!(x0 < o.x + o.w && o.x < x1)) continue;
+          if (dy > 0 && o.y >= s.y + s.h) y = Math.min(y, o.y - s.h);
+          if (dy < 0 && o.y + o.h <= s.y) y = Math.max(y, o.y + o.h);
+        }
+        return clamp(y, 0, ph - s.h);
+      };
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const x = clampX(s.y, s.y + s.h);
+        return { x, y: clampY(x, x + s.w) };
       }
-      x = clamp(x, 0, pw - s.w);
-      // y axis, with x already applied
-      let y = s.y + dy;
-      for (const o of others) {
-        if (!xOver(x, x + s.w, o)) continue;
-        if (dy > 0 && o.y >= s.y + s.h) y = Math.min(y, o.y - s.h);
-        if (dy < 0 && o.y + o.h <= s.y) y = Math.max(y, o.y + o.h);
-      }
-      y = clamp(y, 0, ph - s.h);
-      return { x, y };
+      const y = clampY(s.x, s.x + s.w);
+      return { y, x: clampX(y, y + s.h) };
     }
 
     function tryResize(s, corner, dx, dy) { // returns final {x, y, w, h}
