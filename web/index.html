@@ -363,6 +363,15 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           playground = null;
         },
       },
+      {
+        title: 'cards · what paper wants',
+        build() {
+          document.getElementById('frames').innerHTML =
+            '<section id="left" class="col"><div id="cardfield"></div></section>';
+          playground = null;
+          renderCards();
+        },
+      },
     ];
 
     let frame = 0;
@@ -448,11 +457,43 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         /^<(ul|pre|table)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
     }
 
+    // ——— cards: adjudication requests, presented on the plane ———
+    // fold: latest card event per id. A card is paper's intent made
+    // visible: it wants a ruling; chat (for now) is the reply channel.
+    let latest = [];
+    function renderCards() {
+      const field = document.getElementById('cardfield');
+      if (!field) return;
+      const cards = new Map();
+      for (const e of latest) if (e.kind === 'card') cards.set(e.id, e);
+      field.innerHTML = '';
+      if (!cards.size) {
+        field.innerHTML = '<p class="card-empty">nothing pending — paper wants for nothing.</p>';
+        return;
+      }
+      for (const c of [...cards.values()].reverse()) {
+        const el = document.createElement('div');
+        el.className = 'card ' + (c.status || 'pending');
+        let html = '<div class="card-head"><strong>' + c.title + '</strong>' +
+          '<span class="card-status">' + (c.status || 'pending') + '</span></div>';
+        if (c.table) {
+          html += '<table><tr>' + c.table.columns.map((h) => '<th>' + h + '</th>').join('') + '</tr>';
+          for (const r of c.table.rows) html += '<tr>' + r.map((x) => '<td>' + x + '</td>').join('') + '</tr>';
+          html += '</table>';
+        }
+        if (c.note) html += '<p class="card-note">' + c.note + '</p>';
+        el.innerHTML = html;
+        field.append(el);
+      }
+    }
+
     let seen = -1;
     async function poll() {
       try {
         const events = await (await fetch('/events')).json();
         if (events.length > seen) {
+          latest = events;
+          renderCards();
           const wasBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
           seen = events.length;
           log.innerHTML = '';

@@ -1,0 +1,76 @@
+{
+  "lexicon": 1,
+  "id": "paper.box",
+  "status": "draft",
+  "node": ".box in #playground (instances: A, B)",
+
+  "events": {
+    "emits": {
+      "box_geometry": {
+        "type": "object",
+        "required": ["ts", "kind", "actor", "name", "geom"],
+        "properties": {
+          "ts":    {"type": "string", "format": "datetime"},
+          "kind":  {"const": "box_geometry"},
+          "actor": {"type": "string"},
+          "name":  {"type": "string", "status": "gap 3 — wants id"},
+          "geom":  {
+            "type": "object",
+            "required": ["x", "y", "w", "h"],
+            "properties": {
+              "x": {"type": "number"}, "y": {"type": "number"},
+              "w": {"type": "number", "minimum": 20},
+              "h": {"type": "number", "minimum": 20}
+            }
+          }
+        },
+        "comment": "release act only — the committed geometry"
+      },
+      "box_drag": {
+        "status": "proposed — specced ~80ms samples under record ●, absent from log (gap 4)",
+        "type": "object",
+        "properties": {
+          "ts": {"type": "string"}, "kind": {"const": "box_drag"},
+          "name": {"type": "string"},
+          "geom": {"$ref": "#/events/emits/box_geometry/properties/geom"}
+        },
+        "comment": "Julian's pointing channel: motion capture as communication, not state"
+      }
+    },
+    "consumes": ["box_geometry"]
+  },
+
+  "domain": {
+    "fold": "lastWriteWins",
+    "comment": "state = {name → geom}, fold takes the latest box_geometry per name; hydration (thread F) is exactly this fold at page load",
+    "states": {
+      "idle":     {"on": {"pointerdown on body": "moving", "pointerdown on corner": "resizing"}},
+      "moving":   {"on": {"pointerup": "idle"}},
+      "resizing": {"on": {"pointerup": "idle"}},
+      "locked":   {"on": {}, "comment": "KNOWN-BROKEN: two-sided corner-lock freezes; escape = axis-pure drag"}
+    },
+    "derives": {
+      "contacts": "for each edge/corner, the set of touching boxes (corner-type collision contract)"
+    },
+    "intents": ["move(dx,dy)", "resize(corner,dx,dy)"],
+    "acts": {
+      "release": {
+        "event": "box_geometry",
+        "guard": "geom changed vs gesture start",
+        "via": "POST /event"
+      }
+    },
+    "resolver": "cornerContract — named code, not data (pseudocode p1–5 in doc box)"
+  },
+
+  "system": {
+    "tick": "pointer events (no poll); hydration tick at page load",
+    "source": "GET /events on load, then live via chat poll cadence"
+  },
+
+  "render": {
+    "element": ".box[data-name]",
+    "template": "absolute-positioned div, 1px border, 4 corner handles, centered name label",
+    "ephemeral": ["in-gesture geometry (render-local until release)", "hover"]
+  }
+}

@@ -302,3 +302,15 @@ form .status {
   text-align: right;
   padding: 0 12px 0 8px;
 }
+
+/* cards: adjudication requests on the plane */
+#cardfield { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.card { border: 1px solid #000; background: #fff; padding: 12px 14px; max-width: 720px; }
+.card.ruled { opacity: .45; }
+.card-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.card-status { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.card.pending .card-status { background: #000; color: #fff; padding: 1px 6px; }
+.card table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.card th, .card td { border: 1px solid #000; padding: 4px 8px; text-align: left; vertical-align: top; }
+.card-note { font-size: 12px; margin: 8px 0 0; }
+.card-empty { font-style: italic; }

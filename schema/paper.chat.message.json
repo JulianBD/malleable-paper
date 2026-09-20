@@ -1,0 +1,71 @@
+{
+  "lexicon": 1,
+  "id": "paper.chat.message",
+  "status": "draft",
+  "node": "#log (chat drawer)",
+
+  "events": {
+    "emits": {
+      "human_message": {
+        "type": "object",
+        "required": ["ts", "kind", "text"],
+        "properties": {
+          "ts":   {"type": "string", "format": "datetime"},
+          "kind": {"const": "human_message"},
+          "id":   {"type": "string", "status": "proposed — gap 1"},
+          "text": {"type": "string"},
+          "refs": {"type": "array", "items": {"type": "object"},
+                   "status": "proposed — selection-refs thread"}
+        }
+      },
+      "agent_message": {
+        "type": "object",
+        "required": ["ts", "kind", "text"],
+        "properties": {
+          "ts":   {"type": "string", "format": "datetime"},
+          "kind": {"const": "agent_message"},
+          "id":   {"type": "string", "status": "proposed — gap 1"},
+          "text": {"type": "string"},
+          "inReplyTo": {"type": "string",
+                        "status": "proposed — pending→answered pairing"}
+        }
+      }
+    },
+    "consumes": ["human_message", "agent_message"]
+  },
+
+  "domain": {
+    "fold": "appendOrdered",
+    "comment": "state = ordered list of messages; fold is log-order append, no reduction",
+    "states": {
+      "pending":  {"on": {"agent_message[inReplyTo=self]": "answered"}},
+      "answered": {"on": {}}
+    },
+    "derives": {
+      "unansweredHumans": "messages where kind=human_message and no agent_message.inReplyTo points at them",
+      "comment": "this derivation is the fix for the 3 eaten messages during bootstrap"
+    },
+    "intents": ["send(text)"],
+    "acts": {
+      "send": {
+        "event": "human_message",
+        "guard": "text.trim() nonempty AND gesture ∈ {shift+enter, shift+plus}",
+        "via": "POST /message"
+      }
+    }
+  },
+
+  "system": {
+    "tick": "poll 2000ms",
+    "source": "GET /events (wants ?since=N cursor)",
+    "mirror": "pi extension appends agent_message per settled turn, unconditional",
+    "ingest": "extension polls 1500ms from .paper-offset, steers human_message into session"
+  },
+
+  "render": {
+    "element": "#log",
+    "template": "bubble per message, markdown subset incl. tables",
+    "ephemeral": ["draft text", "scroll position", "drawer open/closed"],
+    "selfOpens": "drawer opens on send"
+  }
+}
