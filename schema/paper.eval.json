@@ -3,40 +3,84 @@
   "id": "paper.eval",
   "status": "draft",
   "node": "none — the queue itself is this object's home",
-
-  "comment": "the scripting layer (the emacs move): agent acts are lisp programs, queued and evaluated at drain time into plain events. The log stays pure events; programs are how acts arrive. Primitives (frame, card, …) are the substrate's DSL — adding one = adding an affordance to the act stage.",
-
+  "comment": "the scripting layer: agent acts are lisp programs over the live log. Readers fold state into the evaluator (count, pending-cards, last-field); writers expand to validated events (frame, card); if/=/>/str make acts conditional on state. The log stays pure events.",
   "events": {
     "emits": {
       "eval": {
         "type": "object",
-        "required": ["ts", "kind", "actor", "program"],
+        "required": [
+          "ts",
+          "kind",
+          "actor",
+          "program"
+        ],
         "properties": {
-          "ts":      {"type": "string", "format": "datetime"},
-          "kind":    {"const": "eval"},
-          "actor":   {"type": "string"},
-          "program": {"type": "string", "comment": "s-expressions; evaluated at drain into validated events"},
-          "emitted": {"type": "array", "items": {"type": "string"},
-                      "comment": "kinds the program produced — the audit trail, filled at drain"}
+          "ts": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "kind": {
+            "const": "eval"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "program": {
+            "type": "string",
+            "comment": "s-expressions; evaluated at drain into validated events"
+          },
+          "emitted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "comment": "kinds the program produced — the audit trail, filled at drain"
+          }
         }
       }
     },
-    "consumes": ["eval"]
+    "consumes": [
+      "eval"
+    ]
   },
-
   "domain": {
     "fold": "none — eval events are records of evaluation, not state; their PRODUCTS carry the state",
     "states": {},
     "derives": {
-      "vocabularyGrowth": "distinct primitives used over time — the DSL accreting"
+      "vocabularyGrowth": "distinct forms used over time — the DSL accreting"
     },
-    "intents": ["script(program)"],
+    "intents": [
+      "script(program)"
+    ],
     "acts": {
-      "script": {"event": "eval", "via": "POST /act", "guard": "parses; unknown primitives reject at drain"}
-    }
+      "script": {
+        "event": "eval",
+        "via": "POST /act",
+        "guard": "parses; unknown primitives reject at drain"
+      }
+    },
+    "readers": [
+      "count",
+      "pending-cards",
+      "last-field"
+    ],
+    "writers": [
+      "frame",
+      "card"
+    ],
+    "forms": [
+      "if",
+      "=",
+      ">",
+      "str"
+    ]
   },
-
-  "system": {"tick": "the drain — evaluation IS a drain-time step"},
-
-  "render": {"element": null, "template": "none directly; products render via their own kinds", "ephemeral": []}
+  "system": {
+    "tick": "the drain — evaluation IS a drain-time step"
+  },
+  "render": {
+    "element": null,
+    "template": "none directly; products render via their own kinds",
+    "ephemeral": []
+  }
 }

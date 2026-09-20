@@ -88,7 +88,7 @@ async function drain() {
   for (const act of batch) {
     if (act.kind === "eval") {
       try {
-        const products = evaluate(String(act.program ?? ""), String(act.actor ?? "agent"));
+        const products = evaluate(String(act.program ?? ""), String(act.actor ?? "agent"), await readEvents());
         expanded.push({ ...act, emitted: products.map((p) => p.kind) }, ...products);
       } catch (e) {
         rejects.push({ act, why: `eval failed: ${e.message}`, ts: new Date().toISOString() });
