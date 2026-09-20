@@ -1,0 +1,10 @@
+import { chromium } from "/Users/juliandorsey/Code/malleable-paper/prototypes/interaction/node_modules/playwright/index.js";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.goto("http://localhost:5174", { waitUntil: "networkidle" });
+await page.waitForTimeout(3000);
+for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(400);
+console.log(await page.locator("#frame-title").textContent());
+await page.screenshot({ path: "shots/11-pipeline-frame.png" });
+await browser.close();

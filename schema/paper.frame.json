@@ -3,53 +3,118 @@
   "id": "paper.frame",
   "status": "draft",
   "node": "#frames switcher (‹ › buttons, ←/→ keys)",
-
   "events": {
     "emits": {
       "frame_switch": {
         "status": "proposed — ruling 7: 'frames are state → frame_switch wants to be an event'",
         "type": "object",
-        "required": ["ts", "kind", "frame"],
+        "required": [
+          "ts",
+          "kind",
+          "frame"
+        ],
         "properties": {
-          "ts":    {"type": "string", "format": "datetime"},
-          "kind":  {"const": "frame_switch"},
-          "frame": {"type": "integer", "minimum": 1},
-          "via":   {"enum": ["buttons", "keys", "agent"], "status": "proposed"}
+          "ts": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "kind": {
+            "const": "frame_switch"
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "via": {
+            "enum": [
+              "buttons",
+              "keys",
+              "agent"
+            ],
+            "status": "proposed"
+          }
         }
+      },
+      "frame_def": {
+        "type": "object",
+        "required": [
+          "ts",
+          "kind",
+          "id",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "kind": {
+            "const": "frame_def"
+          },
+          "id": {
+            "type": "string",
+            "comment": "fold key — latest def per id wins"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "comment": "markdown; rendered by the page's md()"
+          }
+        },
+        "comment": "agent-manifested frame: the act stage's first DSL op. Page folds frame_defs into dynamic frames after the static ones — no reload."
       }
     },
-    "consumes": ["frame_switch"]
+    "consumes": [
+      "frame_switch"
+    ]
   },
-
   "domain": {
-    "fold": "lastWriteWins",
+    "fold": "lastWriteWins for current frame; latest-per-id for dynamic frame defs",
     "comment": "state = current frame index; hydration restores the frame you left",
     "states": {
-      "1": {"on": {"frame_switch{frame:2}": "2"}},
-      "2": {"on": {"frame_switch{frame:1}": "1"}}
+      "1": {
+        "on": {
+          "frame_switch{frame:2}": "2"
+        }
+      },
+      "2": {
+        "on": {
+          "frame_switch{frame:1}": "1"
+        }
+      }
     },
     "derives": {
       "visibleWidgets": "which lexicon nodes are on the current frame (affects their system ticks)"
     },
-    "intents": ["goto(n)"],
+    "intents": [
+      "goto(n)"
+    ],
     "acts": {
       "goto": {
         "event": "frame_switch",
         "guard": "n ∈ [1,2] AND n ≠ current AND focus ∉ chat textarea (keys only)",
         "via": "POST /event"
+      },
+      "define": {
+        "event": "frame_def",
+        "via": "POST /act",
+        "comment": "agent adds/updates a frame; appears on next poll"
       }
     }
   },
-
   "system": {
     "tick": "key/button events; no poll",
     "membership": "chat textarea exempts ←/→ from frame intents"
   },
-
   "render": {
     "element": "#fw (frame window) + #frame-title",
     "template": "one frame visible at a time, translate or display swap",
-    "ephemeral": ["transition animation"],
+    "ephemeral": [
+      "transition animation"
+    ],
     "knownBroken": "doc-box page position resets on frame switch-back — page state not kept (belongs to paper.docbox lexicon, but this frame machine is what wipes it)"
   }
 }

@@ -388,10 +388,39 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     ];
 
     let frame = 0;
+    // dynamic frames: frame_def events folded into extra frames — the
+    // agent manifests UI by appending events; the page folds, no reloads.
+    const dynFrames = new Map(); // id -> frame_def event
+    function foldFrames() {
+      for (const e of latest) if (e.kind === 'frame_def') dynFrames.set(e.id, e);
+    }
+    function allFrames() {
+      return FRAMES.concat([...dynFrames.values()].map((d) => ({
+        title: d.title,
+        build() {
+          document.getElementById('frames').innerHTML =
+            '<section id="left" class="col"><div id="sysframe"><div class="sys dynframe">' + md(d.body) + '</div></div></section>';
+          playground = null;
+        },
+      })));
+    }
+
     function switchFrame(n) {
-      frame = Math.max(0, Math.min(FRAMES.length - 1, n));
-      document.getElementById('frame-title').textContent = (frame + 1) + '/' + FRAMES.length + ' · ' + FRAMES[frame].title;
-      FRAMES[frame].build();
+      const af = allFrames();
+      frame = Math.max(0, Math.min(af.length - 1, n));
+      document.getElementById('frame-title').textContent = (frame + 1) + '/' + af.length + ' · ' + af[frame].title;
+      af[frame].build();
+    }
+    // called from poll when new events arrive: pick up new/updated frame_defs
+    function syncFrames() {
+      const before = JSON.stringify([...dynFrames.entries()]);
+      foldFrames();
+      const after = JSON.stringify([...dynFrames.entries()]);
+      if (before === after) return;
+      const af = allFrames();
+      if (frame >= af.length) frame = af.length - 1;
+      document.getElementById('frame-title').textContent = (frame + 1) + '/' + af.length + ' · ' + af[frame].title;
+      if (frame >= FRAMES.length) af[frame].build(); // live-update the dynamic frame you're looking at
     }
     document.getElementById('fprev').addEventListener('click', () => switchFrame(frame - 1));
     document.getElementById('fnext').addEventListener('click', () => switchFrame(frame + 1));
@@ -451,6 +480,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
     function md(src) {
       let s = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       s = s.replace(/```([\s\S]*?)```/g, (_, code) => '<pre>' + code.replace(/^\n|\n$/g, '') + '</pre>');
+      s = s.replace(/^(#{1,4}) (.+)$/gm, (_, h, t) => '<h' + (h.length + 1) + '>' + t + '</h' + (h.length + 1) + '>');
       s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
       s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
       s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
@@ -467,7 +497,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
         return pre + html + '</table>';
       });
       return s.split(/\n{2,}/).map((p) =>
-        /^<(ul|pre|table)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+        /^<(ul|pre|table|h[2-5])/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
     }
 
     // ——— cards: adjudication requests, presented on the plane ———
@@ -625,6 +655,7 @@ THE THREE MACHINES (07:50): the system is layered orthogonal state machines — 
           latest = latest.concat(fresh);
           renderCards();
           renderSys();
+          syncFrames();
           const wasBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
           log.innerHTML = '';
           for (const e of latest) {

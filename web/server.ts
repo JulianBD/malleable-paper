@@ -44,6 +44,20 @@ async function loadRegistry() {
 let registry = await loadRegistry();
 console.log(`lexicon registry: ${[...registry.keys()].sort().join(", ")}`);
 
+// the registry is live: lexicons evolve as we design, so schema/ changes
+// reload it (debounced) — otherwise every new kind needs a server restart,
+// which is exactly the friction the queue exists to remove.
+import { watch } from "node:fs";
+let reloadTimer;
+watch(SCHEMA, () => {
+  clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(async () => {
+    lexicons = [];
+    registry = await loadRegistry();
+    console.log(`registry reloaded: ${[...registry.keys()].sort().join(", ")}`);
+  }, 200);
+});
+
 async function readEvents() {
   try {
     const raw = await Bun.file(LOG).text();
