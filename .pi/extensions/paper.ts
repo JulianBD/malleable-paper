@@ -9,10 +9,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const LOG = join(import.meta.dir, "..", "..", "events.jsonl");
-const OFFSET = join(import.meta.dir, "..", "..", ".paper-offset");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const LOG = join(HERE, "..", "..", "events.jsonl");
+const OFFSET = join(HERE, "..", "..", ".paper-offset");
 
 export default function (pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | undefined;
