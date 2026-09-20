@@ -317,9 +317,18 @@ form .status {
 
 /* card forms: ruling supplied via the card itself */
 .card-form { margin-top: 10px; border-top: 1px solid #000; padding-top: 8px; }
-.card-field { display: flex; gap: 12px; align-items: baseline; margin: 4px 0; font-size: 13px; }
-.card-ref { font-weight: bold; min-width: 24px; }
-.card-field label { display: flex; gap: 4px; align-items: baseline; }
-.card-form textarea { width: 100%; min-height: 44px; margin-top: 8px; font: inherit; font-size: 13px; border: 1px solid #000; padding: 4px 6px; background: #fff; }
-.card-form button { margin-top: 6px; font: inherit; font-size: 13px; border: 1px solid #000; background: #000; color: #fff; padding: 3px 14px; cursor: pointer; }
+.card-field { display: flex; gap: 10px; align-items: baseline; margin: 6px 0; font-size: 13px; }
+.card-ref { font-weight: bold; min-width: 28px; }
+.card-opts { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.card-opts label { display: flex; gap: 4px; align-items: baseline; white-space: nowrap; }
+.card-form textarea { width: 100%; box-sizing: border-box; min-height: 44px; margin-top: 8px; font: inherit; font-size: 13px; border: 1px solid #000; padding: 4px 6px; background: #fff; }
+.card-buttons { display: flex; gap: 8px; margin-top: 6px; }
+.card-form button { font: inherit; font-size: 13px; border: 1px solid #000; background: #000; color: #fff; padding: 3px 14px; cursor: pointer; }
+.card-form button.discuss { background: #fff; color: #000; }
+.card-discuss { font-size: 12px; margin: 6px 0 0; border-left: 2px solid #000; padding-left: 8px; }
+.card-discuss .ts { opacity: .5; margin-left: 6px; }
 .card-blurb { font-size: 14px; margin: 0 0 10px; max-width: 62ch; }
+
+/* card forms are vertical — the bare `form { display:flex }` rule above
+   is the chat bar's and was leaking into every form on the plane */
+.card-form { flex-direction: column; align-items: stretch; }
